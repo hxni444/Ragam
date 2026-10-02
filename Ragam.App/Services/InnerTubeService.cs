@@ -3,9 +3,9 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Velune.Desktop.App.Models;
+using Ragam.App.Models;
 
-namespace Velune.Desktop.App.Services;
+namespace Ragam.App.Services;
 
 public class InnerTubeSession
 {
@@ -22,7 +22,7 @@ public class InnerTubeService
 {
     private static readonly string SessionFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VeluneDesktop",
+        "Ragam",
         "ytm_session.json"
     );
 
@@ -1085,7 +1085,7 @@ public class InnerTubeService
 
         if (thumb.StartsWith("//")) thumb = "https:" + thumb;
 
-        // Navigation Endpoint analysis (Identical to Velune APK MusicTwoRowItemRenderer)
+        // Navigation Endpoint analysis (Identical to Ragam APK MusicTwoRowItemRenderer)
         if (twoRow.TryGetProperty("navigationEndpoint", out var nav))
         {
             // A: WatchEndpoint -> Song

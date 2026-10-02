@@ -2,9 +2,9 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using Velune.Desktop.App.Models;
+using Ragam.App.Models;
 
-namespace Velune.Desktop.App.Services;
+namespace Ragam.App.Services;
 
 public class LyricsService
 {
@@ -14,7 +14,7 @@ public class LyricsService
     public LyricsService()
     {
         _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "VeluneDesktop/1.0.0 (https://github.com/nikhilvishwakarma00/Velune)");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Ragam/1.0.0 (https://github.com/nikhilvishwakarma00/Ragam)");
     }
 
     public async Task<LyricsDto> GetLyricsAsync(string trackId, string title, string artist, double durationSeconds)

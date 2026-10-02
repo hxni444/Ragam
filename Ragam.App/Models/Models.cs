@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Velune.Desktop.App.Models;
+namespace Ragam.App.Models;
 
 public record TrackDto(
     [property: JsonPropertyName("id")] string Id,

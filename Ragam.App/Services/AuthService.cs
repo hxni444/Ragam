@@ -3,9 +3,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Velune.Desktop.App.Data;
+using Ragam.App.Data;
 
-namespace Velune.Desktop.App.Services;
+namespace Ragam.App.Services;
 
 public record AuthStateDto(bool IsLoggedIn, string? UserName, string? UserEmail, string? AvatarUrl, string? UserId = null);
 
@@ -13,7 +13,7 @@ public class AuthService
 {
     private static readonly string AuthFile = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VeluneDesktop",
+        "Ragam",
         "auth_session.json"
     );
 
@@ -127,7 +127,7 @@ public class AuthService
         var state = new AuthStateDto(
             IsLoggedIn: true,
             UserName: "Guest Listener",
-            UserEmail: "guest@velune.local",
+            UserEmail: "guest@ragam.local",
             AvatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop",
             UserId: "guest_session"
         );
@@ -137,7 +137,7 @@ public class AuthService
 
     private static string HashPassword(string password)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password + "VeluneSecretSalt2026"));
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password + "RagamSecretSalt2026"));
         return Convert.ToHexString(bytes);
     }
 }

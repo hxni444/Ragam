@@ -1,14 +1,14 @@
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Text.Json;
-using Velune.Desktop.App.Models;
+using Ragam.App.Models;
 using YoutubeExplode;
 using YoutubeExplode.Common;
 using YoutubeExplode.Playlists;
 using YoutubeExplode.Search;
 using YoutubeExplode.Videos.Streams;
 
-namespace Velune.Desktop.App.Services;
+namespace Ragam.App.Services;
 
 public class YouTubeService
 {

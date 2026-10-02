@@ -103,7 +103,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
-      {/* Category Filter Chips (Velune APK dynamic chips) */}
+      {/* Category Filter Chips (Ragam APK dynamic chips) */}
       <div className="home-chips-row">
         {chipsToRender.map((chip) => (
           <button
@@ -116,7 +116,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* Dynamic Home Shelves/Sections (Exact Velune Android APK structure) */}
+      {/* Dynamic Home Shelves/Sections (Exact Ragam Android APK structure) */}
       {feed?.sections && feed.sections.length > 0 ? (
         feed.sections.map((section, sIdx) => {
           const songItems = section.items.filter((i) => i.type === 'song').map(toTrack);

@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Velune.Desktop.App.Data;
+namespace Ragam.App.Data;
 
 [Table("FavoriteTracks")]
 public class FavoriteTrackEntity

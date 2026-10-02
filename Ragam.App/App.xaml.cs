@@ -2,7 +2,7 @@
 using System.Data;
 using System.Windows;
 
-namespace Velune.Desktop.App;
+namespace Ragam.App;
 
 /// <summary>
 /// Interaction logic for App.xaml

@@ -4,10 +4,10 @@ using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
-using Velune.Desktop.App.Models;
-using Velune.Desktop.App.Services;
+using Ragam.App.Models;
+using Ragam.App.Services;
 
-namespace Velune.Desktop.App.Interop;
+namespace Ragam.App.Interop;
 
 public class BridgeHandler
 {

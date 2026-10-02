@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using Velune.Desktop.App.Data;
-using Velune.Desktop.App.Models;
+using Ragam.App.Data;
+using Ragam.App.Models;
 
-namespace Velune.Desktop.App.Services;
+namespace Ragam.App.Services;
 
 public class DatabaseService
 {

@@ -1,8 +1,8 @@
 using DiscordRPC;
 using DiscordRPC.Logging;
-using Velune.Desktop.App.Models;
+using Ragam.App.Models;
 
-namespace Velune.Desktop.App.Services;
+namespace Ragam.App.Services;
 
 public class DiscordRpcService : IDisposable
 {
@@ -40,7 +40,7 @@ public class DiscordRpcService : IDisposable
                     Assets = new Assets
                     {
                         LargeImageKey = !string.IsNullOrEmpty(track.ThumbnailUrl) ? track.ThumbnailUrl : "app_icon",
-                        LargeImageText = track.Album ?? "Velune Desktop",
+                        LargeImageText = track.Album ?? "RAGAM",
                         SmallImageKey = "play_icon",
                         SmallImageText = "Playing"
                     },

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 
-namespace Velune.Desktop.App.Data;
+namespace Ragam.App.Data;
 
 public class AppDbContext : DbContext
 {
@@ -13,10 +13,10 @@ public class AppDbContext : DbContext
 
     private static readonly string DbDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "VeluneDesktop"
+        "Ragam"
     );
 
-    private static readonly string DbPath = Path.Combine(DbDirectory, "velune_library.db");
+    private static readonly string DbPath = Path.Combine(DbDirectory, "ragam_library.db");
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

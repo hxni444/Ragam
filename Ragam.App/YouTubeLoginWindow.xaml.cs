@@ -1,9 +1,9 @@
 using System.Text;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
-using Velune.Desktop.App.Services;
+using Ragam.App.Services;
 
-namespace Velune.Desktop.App;
+namespace Ragam.App;
 
 public partial class YouTubeLoginWindow : Window
 {

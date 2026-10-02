@@ -1,72 +1,84 @@
-# 🌌 Velune Desktop
+# 🎵 RAGAM
 
-A modern, subscription-free YouTube Music desktop client built with **.NET Core (C#)**, **Microsoft WebView2**, and **React (TypeScript)**.
+A modern, fast, subscription-free YouTube Music desktop player built with **.NET 8 (C#)**, **Microsoft WebView2**, and **React 18 (TypeScript)**.
 
 ---
 
-## ⚡ Features
-- 🚫 **Ad-free & Unlocked**: Direct audio stream isolation (Opus ~160kbps & AAC) from YouTube's streaming CDN without ad manifests.
-- 🎤 **Real-Time Synced Lyrics**: Synchronized `.lrc` and word-by-word karaoke highlights powered by LRCLIB and YouTube transcripts.
-- 🎨 **Material You / Glassmorphism UI**: High-fidelity dark mode with dynamic glows, animated waveform scrubber, and smooth Framer Motion transitions.
-- 🎧 **Play Queue & History**: Full queue management, shuffle, repeat modes, and local listening history.
-- ❤️ **Local-First SQLite Database**: Offline favorites and library persistence without requiring external servers.
-- 🎮 **Discord Rich Presence**: Live "Listening to..." status updates on Discord.
-- 📦 **Single Standalone Executable**: Packages both the backend engine and React frontend into a portable `.exe`.
+## ✨ Key Features
+
+- 🎧 **Ad-Free & High-Fidelity Audio**: Direct Opus/AAC audio stream playback straight from YouTube Music CDNs with zero ads.
+- 🎤 **Synchronized Lyrics**: Real-time karaoke-style word highlights and line-by-line scrolling lyrics powered by LRCLIB and YouTube transcripts.
+- 🎨 **Sleek Custom UI**: Dark glassmorphic design system in theme orange (`#FF5400`), smooth Framer Motion micro-interactions, and a custom frameless window with native Aero Snap support.
+- 📋 **Library & Offline Playlists**: Manage favorites, custom playlists, and local listening history stored in a local-first SQLite database.
+- 🎮 **Discord Rich Presence**: Live "Listening to..." activity status on Discord with song titles, artists, and live album art.
+- 🚀 **100% Standalone Executable**: Self-contained single-file `.exe` with embedded UI assets — zero installation or dependencies required.
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-Velune.Desktop/
-├── Velune.Desktop.App/       # .NET 8 WPF Host & Services
-│   ├── Data/                 # SQLite DbContext & Entities (Favorites, History, Playlists)
-│   ├── Interop/              # BridgeHandler (WebMessage IPC router between React & C#)
-│   ├── Models/               # Track, Lyrics, and HomeFeed DTOs
-│   ├── Services/             # YouTubeService, LyricsService, DiscordRpcService, DatabaseService
-│   ├── MainWindow.xaml       # Modern borderless window with WebView2
-│   └── MainWindow.xaml.cs    # Host initialization & Dev/Prod route detection
+Ragam/
+├── Ragam.App/                  # .NET 8 WPF Host & Core Services
+│   ├── Data/                  # Local SQLite DbContext (Favorites, History, Playlists)
+│   ├── Interop/               # BridgeHandler (Bidirectional WebMessage IPC between React & C#)
+│   ├── Models/                # Track, Playlist, Album, and Lyrics Data Models
+│   ├── Services/              # YouTubeService, InnerTubeService, LyricsService, DiscordRpcService
+│   ├── MainWindow.xaml        # Borderless WindowChrome host for WebView2
+│   └── app.ico                # Custom multi-resolution app icon
 │
-└── Velune.Desktop.UI/        # React 18 + Vite + TypeScript Frontend
-    ├── src/
-    │   ├── components/       # PlayerBar, SyncedLyricsView, QueueDrawer, Sidebar, TitleBar, TrackCards
-    │   ├── context/          # PlayerContext (Audio element, Queue, Volume, State)
-    │   ├── pages/            # HomePage (Quick Picks, Trending, Hits), SearchPage, LibraryPage
-    │   ├── services/         # NativeBridge (Typed WebMessage RPC client)
-    │   └── styles/           # Dark Glassmorphism CSS Design System
+├── Ragam.UI/                   # React 18 + Vite + TypeScript Frontend
+│   ├── src/
+│   │   ├── components/        # PlayerBar, SyncedLyricsView, QueueDrawer, Sidebar, TitleBar, AuthModal
+│   │   ├── context/           # PlayerContext & State Management
+│   │   ├── pages/             # HomePage, SearchPage, LibraryPage, ArtistPage, AlbumPage
+│   │   ├── services/          # NativeBridge RPC client & Firebase Authentication
+│   │   └── styles/            # Glassmorphic CSS Theme & Design Tokens
+│
+└── release/
+    └── Ragam.exe              # Standalone Windows x64 Executable
 ```
 
 ---
 
-## 🚀 Running in Development Mode (With Hot Reload)
+## 💻 Development Setup
 
-1. **Start the React Vite Dev Server**:
-   ```bash
-   cd Velune.Desktop/Velune.Desktop.UI
-   npm run dev
-   ```
+### Prerequisites
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Node.js 18+](https://nodejs.org/)
 
-2. **Launch the .NET WPF App**:
-   ```bash
-   cd Velune.Desktop/Velune.Desktop.App
-   dotnet run
-   ```
-   *The app automatically detects `http://localhost:5173` and attaches for instant Hot Module Replacement (HMR).*
+### 1. Start the Frontend Dev Server
+```bash
+cd Ragam.UI
+npm install
+npm run dev
+```
+
+### 2. Launch the Desktop Application
+```bash
+cd Ragam.App
+dotnet run
+```
+*The app automatically detects `http://localhost:5173` and attaches for instant Hot Module Replacement (HMR).*
 
 ---
 
-## 📦 Building Single Standalone `.exe`
+## 📦 Building the Standalone Release Executable
 
-1. **Build the React production bundle**:
+1. **Build the React Frontend**:
    ```bash
-   cd Velune.Desktop/Velune.Desktop.UI
+   cd Ragam.UI
    npm run build
    ```
 
-2. **Publish the Single `.exe`**:
+2. **Publish the Self-Contained `.exe`**:
    ```bash
-   cd Velune.Desktop/Velune.Desktop.App
-   dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+   cd Ragam.App
+   dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ../release
    ```
-   *Output executable will be generated at:*
-   `Velune.Desktop.App/bin/Release/net8.0-windows/win-x64/publish/Velune.Desktop.App.exe`
+   *The standalone executable with embedded UI and custom icon will be generated at `release/Ragam.exe`.*
+
+---
+
+## 📄 License
+This project is open-source under the MIT License.
