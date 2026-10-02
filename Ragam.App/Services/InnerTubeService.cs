@@ -782,33 +782,7 @@ public class InnerTubeService
         // Detect navigation endpoint type
         if (twoRow.TryGetProperty("navigationEndpoint", out var nav))
         {
-            // 1. Song (watchEndpoint)
-            if (nav.TryGetProperty("watchEndpoint", out var watch) &&
-                watch.TryGetProperty("videoId", out var vidProp) &&
-                !string.IsNullOrEmpty(vidProp.GetString()))
-            {
-                var videoId = vidProp.GetString()!;
-                var trItem = new TrackDto(
-                    Id: videoId,
-                    Title: title,
-                    Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "Various Artists",
-                    Album: null,
-                    DurationSeconds: 210,
-                    ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg"
-                );
-                return new HomeSectionItemDto(
-                    Type: "song",
-                    Id: videoId,
-                    Title: title,
-                    Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "Various Artists",
-                    ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg",
-                    Year: null,
-                    DurationSeconds: 210,
-                    Tracks: new List<TrackDto> { trItem }
-                );
-            }
-
-            // 2. BrowseEndpoint (Artist, Album, or Playlist/Mix)
+            // 1. BrowseEndpoint (Artist, Album, or Playlist/Mix)
             if (nav.TryGetProperty("browseEndpoint", out var browse))
             {
                 var browseId = browse.TryGetProperty("browseId", out var bIdProp) ? bIdProp.GetString() ?? "" : "";
@@ -821,42 +795,97 @@ public class InnerTubeService
                     pageType = ptProp.GetString() ?? "";
                 }
 
-                // Artist
-                if (pageType == "MUSIC_PAGE_TYPE_ARTIST" || browseId.StartsWith("UC") || browseId.StartsWith("FEmusic_library_artist"))
+                if (!string.IsNullOrEmpty(browseId))
                 {
-                    return new HomeSectionItemDto(
-                        Type: "artist",
-                        Id: !string.IsNullOrEmpty(browseId) ? browseId : title.ToLowerInvariant().Replace(" ", "_"),
-                        Title: title,
-                        Artist: "Artist",
-                        ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop"
-                    );
-                }
+                    if (pageType == "MUSIC_PAGE_TYPE_ARTIST" || browseId.StartsWith("UC") || browseId.StartsWith("FEmusic_library_artist"))
+                    {
+                        return new HomeSectionItemDto(
+                            Type: "artist",
+                            Id: browseId,
+                            Title: title,
+                            Artist: "Artist",
+                            ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop"
+                        );
+                    }
 
-                // Album
-                if (pageType == "MUSIC_PAGE_TYPE_ALBUM" || pageType == "MUSIC_PAGE_TYPE_AUDIOBOOK" || browseId.StartsWith("MPREb_") || browseId.StartsWith("FEmusic_library_album"))
-                {
+                    if (pageType == "MUSIC_PAGE_TYPE_PLAYLIST" || browseId.StartsWith("VL") || browseId.StartsWith("PL") || browseId.StartsWith("RD") || browseId.StartsWith("FEmusic_library_playlist"))
+                    {
+                        var cleanId = browseId.StartsWith("VL") ? browseId.Substring(2) : browseId;
+                        return new HomeSectionItemDto(
+                            Type: "playlist",
+                            Id: cleanId,
+                            Title: title,
+                            Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "YouTube Music",
+                            ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&h=300&fit=crop",
+                            Year: title.Contains("Mix", StringComparison.OrdinalIgnoreCase) ? "Mix" : "Playlist"
+                        );
+                    }
+
+                    // Album default for browse endpoints
                     return new HomeSectionItemDto(
                         Type: "album",
-                        Id: !string.IsNullOrEmpty(browseId) ? browseId : Guid.NewGuid().ToString("N"),
+                        Id: browseId,
                         Title: title,
                         Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "Various Artists",
                         ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&h=300&fit=crop",
                         Year: "Album"
                     );
                 }
+            }
 
-                // Playlist / Mix
-                if (pageType == "MUSIC_PAGE_TYPE_PLAYLIST" || browseId.StartsWith("VL") || browseId.StartsWith("PL") || browseId.StartsWith("RD") || browseId.StartsWith("FEmusic_library_playlist"))
+            // 2. WatchPlaylistEndpoint
+            if (nav.TryGetProperty("watchPlaylistEndpoint", out var wp) &&
+                wp.TryGetProperty("playlistId", out var wpId) &&
+                !string.IsNullOrEmpty(wpId.GetString()))
+            {
+                var plId = wpId.GetString()!;
+                return new HomeSectionItemDto(
+                    Type: "playlist",
+                    Id: plId,
+                    Title: title,
+                    Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "YouTube Music",
+                    ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&h=300&fit=crop",
+                    Year: title.Contains("Mix", StringComparison.OrdinalIgnoreCase) ? "Mix" : "Playlist"
+                );
+            }
+
+            // 3. WatchEndpoint (could be song, single, or playlist/radio)
+            if (nav.TryGetProperty("watchEndpoint", out var watch))
+            {
+                var watchPlId = watch.TryGetProperty("playlistId", out var wpidProp) ? wpidProp.GetString() : null;
+                var watchVid = watch.TryGetProperty("videoId", out var wvidProp) ? wvidProp.GetString() : null;
+
+                if (!string.IsNullOrEmpty(watchPlId) && (watchPlId.StartsWith("RD") || watchPlId.StartsWith("PL") || watchPlId.StartsWith("OLAK")))
                 {
-                    var cleanId = browseId.StartsWith("VL") ? browseId.Substring(2) : browseId;
                     return new HomeSectionItemDto(
                         Type: "playlist",
-                        Id: !string.IsNullOrEmpty(cleanId) ? cleanId : Guid.NewGuid().ToString("N"),
+                        Id: watchPlId,
                         Title: title,
                         Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "YouTube Music",
-                        ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&h=300&fit=crop",
-                        Year: title.Contains("Mix", StringComparison.OrdinalIgnoreCase) ? "Mix" : "Playlist"
+                        ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : (watchVid != null ? $"https://i.ytimg.com/vi/{watchVid}/hqdefault.jpg" : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&h=300&fit=crop"),
+                        Year: "Playlist"
+                    );
+                }
+
+                if (!string.IsNullOrEmpty(watchVid))
+                {
+                    var trItem = new TrackDto(
+                        Id: watchVid,
+                        Title: title,
+                        Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "Various Artists",
+                        Album: null,
+                        DurationSeconds: 210,
+                        ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : $"https://i.ytimg.com/vi/{watchVid}/hqdefault.jpg"
+                    );
+                    return new HomeSectionItemDto(
+                        Type: "song",
+                        Id: watchVid,
+                        Title: title,
+                        Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "Various Artists",
+                        ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : $"https://i.ytimg.com/vi/{watchVid}/hqdefault.jpg",
+                        Year: null,
+                        DurationSeconds: 210,
+                        Tracks: new List<TrackDto> { trItem }
                     );
                 }
             }
@@ -876,7 +905,7 @@ public class InnerTubeService
 
         return new HomeSectionItemDto(
             Type: title.Contains("Mix", StringComparison.OrdinalIgnoreCase) ? "playlist" : "album",
-            Id: Guid.NewGuid().ToString("N"),
+            Id: title.ToLowerInvariant().Replace(" ", "_"),
             Title: title,
             Artist: !string.IsNullOrEmpty(subtitle) ? subtitle : "Various Artists",
             ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&h=300&fit=crop",
@@ -1385,7 +1414,7 @@ public class InnerTubeService
         {
             var browseId = playlistId.StartsWith("VL") || playlistId.StartsWith("MPREb_") || playlistId.StartsWith("FEmusic_")
                 ? playlistId
-                : $"VL{playlistId}";
+                : (playlistId.StartsWith("PL") || playlistId.StartsWith("RD") || playlistId.StartsWith("OLAK") ? $"VL{playlistId}" : playlistId);
 
             using var doc = await BrowseJsonAsync(browseId);
             if (doc != null)

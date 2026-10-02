@@ -15,18 +15,6 @@ const DEFAULT_CHIPS = ['All', 'Energize', 'Workout', 'Relax', 'Focus', 'Commute'
 let cachedFeed: HomeFeed | null = null;
 let cachedChip = 'All';
 
-const getSectionPriority = (title: string): number => {
-  const t = title.toLowerCase();
-  if (t.includes('featured playlist') || t.includes('featured')) return 1;
-  if (t.includes('mixed for you') || t.includes('mixed')) return 2;
-  if (t.includes('quick pick')) return 3;
-  if (t.includes('listen again') || t.includes('forgotten')) return 4;
-  if (t.includes('similar to')) return 5;
-  if (t.includes('trending') || t.includes('hits') || t.includes('chart')) return 6;
-  if (t.includes('popular artist') || t.includes('artist')) return 7;
-  if (t.includes('new release') || t.includes('album')) return 8;
-  return 10;
-};
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   const [feed, setFeed] = useState<HomeFeed | null>(cachedFeed);
@@ -119,10 +107,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     ? feed.chips 
     : DEFAULT_CHIPS.map(c => ({ title: c, params: undefined }));
 
-  // Sort sections: "Featured playlists for you" first, then "Mixed for you", then others
-  const sortedSections = feed?.sections && feed.sections.length > 0
-    ? [...feed.sections].sort((a, b) => getSectionPriority(a.title) - getSectionPriority(b.title))
-    : [];
+  // Render dynamic shelves in natural order from YouTube Music
+  const dynamicSections = feed?.sections && feed.sections.length > 0 ? feed.sections : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
@@ -140,8 +126,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       </div>
 
       {/* Dynamic Home Shelves/Sections */}
-      {sortedSections.length > 0 ? (
-        sortedSections.map((section, sIdx) => {
+      {dynamicSections.length > 0 ? (
+        dynamicSections.map((section, sIdx) => {
           if (!section.items || section.items.length === 0) return null;
 
           const songItems = section.items
