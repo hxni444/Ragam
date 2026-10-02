@@ -48,41 +48,13 @@ public class UpdateService
 
         try
         {
-            // 1. Try official GitHub releases first
-            var releasesUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
-            using var response = await _httpClient.GetAsync(releasesUrl);
-
-            string latestTag = "";
+            string highestTag = "";
             string releaseNotes = "";
             string publishedAt = "";
             string downloadUrl = "";
 
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                using var doc = JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                latestTag = root.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() ?? "" : "";
-                releaseNotes = root.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() ?? "" : "";
-                publishedAt = root.TryGetProperty("published_at", out var pubEl) ? pubEl.GetString() ?? "" : "";
-
-                if (root.TryGetProperty("assets", out var assetsEl) && assetsEl.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var asset in assetsEl.EnumerateArray())
-                    {
-                        var name = asset.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
-                        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                        {
-                            downloadUrl = asset.TryGetProperty("browser_download_url", out var dlEl) ? dlEl.GetString() ?? "" : "";
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // 2. Fallback to Git Tags if no formal release published yet
-            if (string.IsNullOrEmpty(latestTag))
+            // 1. Check all Git Tags first (always has the most up-to-date tags)
+            try
             {
                 var tagsUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/tags";
                 using var tagsResponse = await _httpClient.GetAsync(tagsUrl);
@@ -90,12 +62,70 @@ public class UpdateService
                 {
                     var tagsJson = await tagsResponse.Content.ReadAsStringAsync();
                     using var tagsDoc = JsonDocument.Parse(tagsJson);
-                    if (tagsDoc.RootElement.ValueKind == JsonValueKind.Array && tagsDoc.RootElement.GetArrayLength() > 0)
+                    if (tagsDoc.RootElement.ValueKind == JsonValueKind.Array)
                     {
-                        var firstTag = tagsDoc.RootElement[0];
-                        latestTag = firstTag.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                        foreach (var tagItem in tagsDoc.RootElement.EnumerateArray())
+                        {
+                            var tagName = tagItem.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                            var cleanTag = tagName.TrimStart('v', 'V').Trim();
+                            if (!string.IsNullOrEmpty(cleanTag))
+                            {
+                                if (string.IsNullOrEmpty(highestTag) || IsVersionNewer(cleanTag, highestTag))
+                                {
+                                    highestTag = cleanTag;
+                                }
+                            }
+                        }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking tags: {ex.Message}");
+            }
+
+            // 2. Check official GitHub Release for notes & assets
+            try
+            {
+                var releasesUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
+                using var response = await _httpClient.GetAsync(releasesUrl);
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    var relTag = root.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() ?? "" : "";
+                    var cleanRelTag = relTag.TrimStart('v', 'V').Trim();
+                    
+                    if (!string.IsNullOrEmpty(cleanRelTag))
+                    {
+                        if (string.IsNullOrEmpty(highestTag) || IsVersionNewer(cleanRelTag, highestTag))
+                        {
+                            highestTag = cleanRelTag;
+                        }
+                    }
+
+                    releaseNotes = root.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() ?? "" : "";
+                    publishedAt = root.TryGetProperty("published_at", out var pubEl) ? pubEl.GetString() ?? "" : "";
+
+                    if (root.TryGetProperty("assets", out var assetsEl) && assetsEl.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var asset in assetsEl.EnumerateArray())
+                        {
+                            var name = asset.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                            if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                            {
+                                downloadUrl = asset.TryGetProperty("browser_download_url", out var dlEl) ? dlEl.GetString() ?? "" : "";
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking releases: {ex.Message}");
             }
 
             if (string.IsNullOrEmpty(downloadUrl))
@@ -103,14 +133,12 @@ public class UpdateService
                 downloadUrl = $"https://github.com/{RepoOwner}/{RepoName}/raw/main/release/Ragam.exe";
             }
 
-            var cleanLatestVer = latestTag.TrimStart('v', 'V').Trim();
-
-            if (!string.IsNullOrEmpty(cleanLatestVer) && IsVersionNewer(cleanLatestVer, currentVerStr))
+            if (!string.IsNullOrEmpty(highestTag) && IsVersionNewer(highestTag, currentVerStr))
             {
                 updateInfo.HasUpdate = true;
-                updateInfo.LatestVersion = cleanLatestVer;
-                updateInfo.ReleaseNotes = string.IsNullOrWhiteSpace(releaseNotes) 
-                    ? $"RAGAM v{cleanLatestVer} is now available with the latest features and improvements." 
+                updateInfo.LatestVersion = highestTag;
+                updateInfo.ReleaseNotes = string.IsNullOrWhiteSpace(releaseNotes)
+                    ? $"RAGAM v{highestTag} is ready with the latest audio engine enhancements and bug fixes."
                     : releaseNotes;
                 updateInfo.DownloadUrl = downloadUrl;
                 updateInfo.PublishedAt = publishedAt;
