@@ -27,13 +27,13 @@ public class UpdateService
     public UpdateService()
     {
         _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Ragam-Desktop", "1.0.2"));
+        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Ragam-Desktop", "1.0.3"));
     }
 
     public string GetCurrentVersion()
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
-        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.2";
+        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.3";
     }
 
     public async Task<UpdateInfo> CheckForUpdatesAsync()
