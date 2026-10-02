@@ -122,7 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
             </div>
             <div>
               <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>Liked Songs</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-subdued)' }}>Playlist • Auto</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-subdued)' }}>Playlist</div>
             </div>
           </div>
 
@@ -177,9 +177,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
             borderRadius: '4px',
             letterSpacing: '0.3px'
           }}
-          title="RAGAM v1.0.0"
+          title="RAGAM v1.0.1"
         >
-          v1.0.0
+          v1.0.1
         </span>
       </div>
     </aside>

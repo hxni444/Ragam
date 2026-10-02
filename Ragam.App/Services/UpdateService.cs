@@ -11,8 +11,8 @@ namespace Ragam.App.Services;
 public class UpdateInfo
 {
     public bool HasUpdate { get; set; }
-    public string CurrentVersion { get; set; } = "1.0.0";
-    public string LatestVersion { get; set; } = "1.0.0";
+    public string CurrentVersion { get; set; } = "1.0.1";
+    public string LatestVersion { get; set; } = "1.0.1";
     public string ReleaseNotes { get; set; } = "";
     public string DownloadUrl { get; set; } = "";
     public string PublishedAt { get; set; } = "";
@@ -27,13 +27,13 @@ public class UpdateService
     public UpdateService()
     {
         _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Ragam-Desktop", "1.0.0"));
+        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Ragam-Desktop", "1.0.1"));
     }
 
     public string GetCurrentVersion()
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
-        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.0";
+        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.1";
     }
 
     public async Task<UpdateInfo> CheckForUpdatesAsync()
