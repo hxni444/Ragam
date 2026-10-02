@@ -1408,72 +1408,47 @@ public class InnerTubeService
 
     public async Task<AlbumDto?> GetAlbumOrPlaylistAsync(string title, string artist, string thumbnailUrl, string? playlistId = null)
     {
-        if (string.IsNullOrEmpty(playlistId)) return null;
-
         try
         {
-            var browseId = playlistId.StartsWith("VL") || playlistId.StartsWith("MPREb_") || playlistId.StartsWith("FEmusic_")
-                ? playlistId
-                : (playlistId.StartsWith("PL") || playlistId.StartsWith("RD") || playlistId.StartsWith("OLAK") ? $"VL{playlistId}" : playlistId);
+            var tracks = new List<TrackDto>();
+            string? highResThumb = null;
 
-            using var doc = await BrowseJsonAsync(browseId);
-            if (doc != null)
+            if (!string.IsNullOrEmpty(playlistId))
             {
-                var root = doc.RootElement;
-                var tracks = new List<TrackDto>();
-                string? highResThumb = null;
+                var browseId = playlistId.StartsWith("VL") || playlistId.StartsWith("MPREb_") || playlistId.StartsWith("FEmusic_")
+                    ? playlistId
+                    : (playlistId.StartsWith("PL") || playlistId.StartsWith("RD") || playlistId.StartsWith("OLAK") ? $"VL{playlistId}" : playlistId);
 
-                if (root.TryGetProperty("contents", out var contents) &&
-                    contents.TryGetProperty("singleColumnBrowseResultsRenderer", out var sc) &&
-                    sc.TryGetProperty("tabs", out var tabs) && tabs.GetArrayLength() > 0)
+                using var doc = await BrowseJsonAsync(browseId);
+                if (doc != null)
                 {
-                    var tab0 = tabs[0];
-                    if (tab0.TryGetProperty("tabRenderer", out var tr) &&
-                        tr.TryGetProperty("content", out var tabC) &&
-                        tabC.TryGetProperty("sectionListRenderer", out var sl) &&
-                        sl.TryGetProperty("contents", out var sections))
-                    {
-                        foreach (var sec in sections.EnumerateArray())
-                        {
-                            if (sec.TryGetProperty("musicPlaylistShelfRenderer", out var ps) &&
-                                ps.TryGetProperty("contents", out var psItems))
-                            {
-                                foreach (var item in psItems.EnumerateArray())
-                                {
-                                    if (item.TryGetProperty("musicResponsiveListItemRenderer", out var resp))
-                                    {
-                                        var t = ParseResponsiveTrackItem(resp);
-                                        if (t != null) tracks.Add(t);
-                                    }
-                                }
-                            }
-                            else if (sec.TryGetProperty("musicShelfRenderer", out var ms) &&
-                                     ms.TryGetProperty("contents", out var msItems))
-                            {
-                                foreach (var item in msItems.EnumerateArray())
-                                {
-                                    if (item.TryGetProperty("musicResponsiveListItemRenderer", out var resp))
-                                    {
-                                        var t = ParseResponsiveTrackItem(resp);
-                                        if (t != null) tracks.Add(t);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    ExtractResponsiveTracks(doc.RootElement, tracks);
                 }
 
-                if (tracks.Count > 0)
+                // If browse was empty and playlistId is a direct 11-char video ID (Single)
+                if (tracks.Count == 0 && playlistId.Length == 11 && !playlistId.StartsWith("PL") && !playlistId.StartsWith("VL") && !playlistId.StartsWith("MP"))
                 {
-                    return new AlbumDto(
+                    tracks.Add(new TrackDto(
                         Id: playlistId,
                         Title: title,
                         Artist: artist,
-                        ThumbnailUrl: !string.IsNullOrEmpty(highResThumb) ? highResThumb : thumbnailUrl,
-                        Year: "Album / Playlist",
-                        Tracks: tracks
-                    );
+                        Album: title,
+                        DurationSeconds: 210,
+                        ThumbnailUrl: thumbnailUrl
+                    ));
                 }
+            }
+
+            if (tracks.Count > 0)
+            {
+                return new AlbumDto(
+                    Id: playlistId ?? Guid.NewGuid().ToString("N"),
+                    Title: title,
+                    Artist: artist,
+                    ThumbnailUrl: !string.IsNullOrEmpty(highResThumb) ? highResThumb : thumbnailUrl,
+                    Year: "Album / Single",
+                    Tracks: tracks
+                );
             }
         }
         catch (Exception ex)
@@ -1482,6 +1457,35 @@ public class InnerTubeService
         }
 
         return null;
+    }
+
+    private static void ExtractResponsiveTracks(JsonElement element, List<TrackDto> tracks)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("musicResponsiveListItemRenderer", out var resp))
+            {
+                var t = ParseResponsiveTrackItem(resp);
+                if (t != null && !tracks.Any(existing => existing.Id == t.Id))
+                {
+                    tracks.Add(t);
+                }
+            }
+            else
+            {
+                foreach (var prop in element.EnumerateObject())
+                {
+                    ExtractResponsiveTracks(prop.Value, tracks);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                ExtractResponsiveTracks(item, tracks);
+            }
+        }
     }
 
     private static string GetShelfTitle(JsonElement shelf)

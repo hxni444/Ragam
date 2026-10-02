@@ -216,7 +216,11 @@ public class BridgeHandler
                         var albThumb = req.Payload.GetProperty("thumbnailUrl").GetString() ?? "";
                         var albId = req.Payload.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
                         var albumData = await _innerTubeService.GetAlbumOrPlaylistAsync(albTitle, albArtist, albThumb, albId);
-                        responseData = albumData ?? await _youTubeService.GetAlbumOrPlaylistAsync(albTitle, albArtist, albThumb, albId);
+                        if (albumData == null || albumData.Tracks.Count == 0)
+                        {
+                            albumData = await _youTubeService.GetAlbumOrPlaylistAsync(albTitle, albArtist, albThumb, albId);
+                        }
+                        responseData = albumData;
                         break;
 
                     case "get_artist_details":
