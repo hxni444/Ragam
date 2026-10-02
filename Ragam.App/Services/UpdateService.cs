@@ -27,7 +27,7 @@ public class UpdateService
     public UpdateService()
     {
         _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Ragam-Desktop", "1.0.4"));
+        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Ragam-Desktop", "1.0.5"));
     }
 
     public string GetCurrentVersion()
