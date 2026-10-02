@@ -11,8 +11,8 @@ namespace Ragam.App.Services;
 public class UpdateInfo
 {
     public bool HasUpdate { get; set; }
-    public string CurrentVersion { get; set; } = "1.0.1";
-    public string LatestVersion { get; set; } = "1.0.1";
+    public string CurrentVersion { get; set; } = "1.0.0";
+    public string LatestVersion { get; set; } = "1.0.0";
     public string ReleaseNotes { get; set; } = "";
     public string DownloadUrl { get; set; } = "";
     public string PublishedAt { get; set; } = "";
@@ -48,33 +48,52 @@ public class UpdateService
 
         try
         {
-            var url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
-            using var response = await _httpClient.GetAsync(url);
+            // 1. Try official GitHub releases first
+            var releasesUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
+            using var response = await _httpClient.GetAsync(releasesUrl);
 
-            if (!response.IsSuccessStatusCode)
+            string latestTag = "";
+            string releaseNotes = "";
+            string publishedAt = "";
+            string downloadUrl = "";
+
+            if (response.IsSuccessStatusCode)
             {
-                return updateInfo;
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                latestTag = root.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() ?? "" : "";
+                releaseNotes = root.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() ?? "" : "";
+                publishedAt = root.TryGetProperty("published_at", out var pubEl) ? pubEl.GetString() ?? "" : "";
+
+                if (root.TryGetProperty("assets", out var assetsEl) && assetsEl.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var asset in assetsEl.EnumerateArray())
+                    {
+                        var name = asset.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
+                        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            downloadUrl = asset.TryGetProperty("browser_download_url", out var dlEl) ? dlEl.GetString() ?? "" : "";
+                            break;
+                        }
+                    }
+                }
             }
 
-            var json = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            var tagName = root.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() ?? "" : "";
-            var cleanLatestVer = tagName.TrimStart('v', 'V');
-            var body = root.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() ?? "" : "";
-            var publishedAt = root.TryGetProperty("published_at", out var pubEl) ? pubEl.GetString() ?? "" : "";
-
-            string downloadUrl = "";
-            if (root.TryGetProperty("assets", out var assetsEl) && assetsEl.ValueKind == JsonValueKind.Array)
+            // 2. Fallback to Git Tags if no formal release published yet
+            if (string.IsNullOrEmpty(latestTag))
             {
-                foreach (var asset in assetsEl.EnumerateArray())
+                var tagsUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/tags";
+                using var tagsResponse = await _httpClient.GetAsync(tagsUrl);
+                if (tagsResponse.IsSuccessStatusCode)
                 {
-                    var name = asset.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
-                    if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    var tagsJson = await tagsResponse.Content.ReadAsStringAsync();
+                    using var tagsDoc = JsonDocument.Parse(tagsJson);
+                    if (tagsDoc.RootElement.ValueKind == JsonValueKind.Array && tagsDoc.RootElement.GetArrayLength() > 0)
                     {
-                        downloadUrl = asset.TryGetProperty("browser_download_url", out var dlEl) ? dlEl.GetString() ?? "" : "";
-                        break;
+                        var firstTag = tagsDoc.RootElement[0];
+                        latestTag = firstTag.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
                     }
                 }
             }
@@ -84,11 +103,15 @@ public class UpdateService
                 downloadUrl = $"https://github.com/{RepoOwner}/{RepoName}/raw/main/release/Ragam.exe";
             }
 
-            if (IsVersionNewer(cleanLatestVer, currentVerStr))
+            var cleanLatestVer = latestTag.TrimStart('v', 'V').Trim();
+
+            if (!string.IsNullOrEmpty(cleanLatestVer) && IsVersionNewer(cleanLatestVer, currentVerStr))
             {
                 updateInfo.HasUpdate = true;
                 updateInfo.LatestVersion = cleanLatestVer;
-                updateInfo.ReleaseNotes = body;
+                updateInfo.ReleaseNotes = string.IsNullOrWhiteSpace(releaseNotes) 
+                    ? $"RAGAM v{cleanLatestVer} is now available with the latest features and improvements." 
+                    : releaseNotes;
                 updateInfo.DownloadUrl = downloadUrl;
                 updateInfo.PublishedAt = publishedAt;
             }
