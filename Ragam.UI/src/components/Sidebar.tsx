@@ -44,9 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
 
   return (
     <aside className="sidebar">
-      <div style={{ padding: "12px 16px 16px 16px", display: "flex", alignItems: "center", cursor: "pointer" }} onClick={() => onNavigate({ tab: "home" })}>
-        <img src="/wordmark.svg" alt="RAGAM" style={{ height: "24px", objectFit: "contain" }} />
-      </div>
+      
       {/* Top Nav */}
       <div className="sidebar-nav">
         <div

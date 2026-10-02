@@ -5,9 +5,28 @@ import { bridge } from '../services/bridge';
 export const TitleBar: React.FC = () => {
   return (
     <div className="titlebar">
-      <div className="titlebar-brand">
-        <img src="/logo.svg" alt="RAGAM" style={{ width: 18, height: 18, objectFit: "contain" }} />
-        <span style={{ fontWeight: 800, letterSpacing: '-0.02em' }}>RAGAM</span>
+      <div className="titlebar-brand" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+        <svg
+          viewBox="0 0 1080 250"
+          style={{ height: '18px', width: 'auto' }}
+          version="1.1"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <g transform="matrix(16.19932,0,0,16.19932,-3087.455651,-6390.203435)">
+            <text
+              x="193.324px"
+              y="408.452px"
+              style={{
+                fontFamily: "'Nevera-Regular', 'Nevera', sans-serif",
+                fontSize: '15.347px',
+                fill: '#FF5400',
+                fontWeight: 800,
+              }}
+            >
+              RA<tspan x="215.7px" y="408.452px">G</tspan>AM
+            </text>
+          </g>
+        </svg>
       </div>
 
       <div className="titlebar-controls">
