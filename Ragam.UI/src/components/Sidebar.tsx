@@ -177,9 +177,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
             borderRadius: '4px',
             letterSpacing: '0.3px'
           }}
-          title="RAGAM v1.0.1"
+          title="RAGAM v1.0.2"
         >
-          v1.0.1
+          v1.0.2
         </span>
       </div>
     </aside>

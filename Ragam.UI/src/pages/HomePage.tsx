@@ -11,15 +11,35 @@ interface HomePageProps {
 
 const DEFAULT_CHIPS = ['All', 'Energize', 'Workout', 'Relax', 'Focus', 'Commute', 'Party'];
 
-export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
-  const [feed, setFeed] = useState<HomeFeed | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedChip, setSelectedChip] = useState('All');
+// In-memory module cache to immediately render cached feed and preserve scroll position
+let cachedFeed: HomeFeed | null = null;
+let cachedChip = 'All';
 
-  const loadFeed = async (chipParams?: string) => {
+const getSectionPriority = (title: string): number => {
+  const t = title.toLowerCase();
+  if (t.includes('featured playlist') || t.includes('featured')) return 1;
+  if (t.includes('mixed for you') || t.includes('mixed')) return 2;
+  if (t.includes('quick pick')) return 3;
+  if (t.includes('listen again') || t.includes('forgotten')) return 4;
+  if (t.includes('similar to')) return 5;
+  if (t.includes('trending') || t.includes('hits') || t.includes('chart')) return 6;
+  if (t.includes('popular artist') || t.includes('artist')) return 7;
+  if (t.includes('new release') || t.includes('album')) return 8;
+  return 10;
+};
+
+export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
+  const [feed, setFeed] = useState<HomeFeed | null>(cachedFeed);
+  const [loading, setLoading] = useState(!cachedFeed);
+  const [selectedChip, setSelectedChip] = useState(cachedChip);
+
+  const loadFeed = async (chipParams?: string, isChipSwitch = false) => {
     try {
-      setLoading(true);
+      if (!cachedFeed || isChipSwitch) {
+        setLoading(true);
+      }
       const data = await bridge.getHomeFeed(true, chipParams);
+      cachedFeed = data;
       setFeed(data);
     } catch (err) {
       console.error('Failed to load home feed:', err);
@@ -29,21 +49,23 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   };
 
   useEffect(() => {
-    loadFeed();
+    loadFeed(selectedChip !== 'All' ? selectedChip : undefined);
   }, []);
 
   const handleChipClick = async (chipTitle: string, chipParams?: string) => {
     if (selectedChip === chipTitle && chipTitle !== 'All') {
       setSelectedChip('All');
-      await loadFeed();
+      cachedChip = 'All';
+      await loadFeed(undefined, true);
       return;
     }
 
     setSelectedChip(chipTitle);
+    cachedChip = chipTitle;
     if (chipTitle === 'All') {
-      await loadFeed();
+      await loadFeed(undefined, true);
     } else {
-      await loadFeed(chipParams);
+      await loadFeed(chipParams, true);
     }
   };
 
@@ -60,34 +82,31 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     title: item.title,
     artist: item.artist,
     thumbnailUrl: item.thumbnailUrl,
-    year: item.year || (item.title.toLowerCase().includes('mix') ? 'Mix' : 'Playlist / Album'),
-    tracks: item.tracks || [],
+    year: 'Playlist',
+    tracks: [],
   });
 
   const toArtist = (item: HomeSectionItem): Artist => ({
     id: item.id,
     name: item.title,
     thumbnailUrl: item.thumbnailUrl,
-    topTracks: item.tracks || [],
+    topTracks: [],
   });
 
   if (loading && !feed) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
-        {[1, 2, 3].map((sec) => (
-          <div key={sec} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="skeleton-box" style={{ width: '180px', height: '24px', borderRadius: '4px' }} />
-            <div className="cards-grid">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="spotify-card" style={{ pointerEvents: 'none' }}>
-                  <div className="card-img-container">
-                    <div className="skeleton-box" style={{ width: '100%', height: '100%', borderRadius: '6px' }} />
-                  </div>
-                  <div className="card-info" style={{ gap: '6px' }}>
-                    <div className="skeleton-box" style={{ width: '85%', height: '14px', borderRadius: '3px' }} />
-                    <div className="skeleton-box" style={{ width: '55%', height: '12px', borderRadius: '3px' }} />
-                  </div>
-                </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="skeleton" style={{ width: '80px', height: '32px', borderRadius: '8px' }} />
+          ))}
+        </div>
+        {[1, 2, 3].map((s) => (
+          <div key={s} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="skeleton" style={{ width: '200px', height: '28px', borderRadius: '6px' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
+              {[1, 2, 3, 4, 5, 6].map((c) => (
+                <div key={c} className="skeleton" style={{ height: '240px', borderRadius: '12px' }} />
               ))}
             </div>
           </div>
@@ -96,14 +115,18 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     );
   }
 
-  // Determine chips to display (prefer dynamic from YouTube Music, fallback to defaults)
-  const chipsToRender = feed?.chips && feed.chips.length > 0
-    ? [{ title: 'All', params: undefined }, ...feed.chips]
-    : DEFAULT_CHIPS.map((title) => ({ title, params: undefined }));
+  const chipsToRender = feed?.chips && feed.chips.length > 0 
+    ? feed.chips 
+    : DEFAULT_CHIPS.map(c => ({ title: c, params: undefined }));
+
+  // Sort sections: "Featured playlists for you" first, then "Mixed for you", then others
+  const sortedSections = feed?.sections && feed.sections.length > 0
+    ? [...feed.sections].sort((a, b) => getSectionPriority(a.title) - getSectionPriority(b.title))
+    : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
-      {/* Category Filter Chips (Ragam APK dynamic chips) */}
+      {/* Category Filter Chips */}
       <div className="home-chips-row">
         {chipsToRender.map((chip) => (
           <button
@@ -116,11 +139,16 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* Dynamic Home Shelves/Sections (Exact Ragam Android APK structure) */}
-      {feed?.sections && feed.sections.length > 0 ? (
-        feed.sections.map((section, sIdx) => {
-          const songItems = section.items.filter((i) => i.type === 'song').map(toTrack);
-          const isFresh = section.title.toLowerCase().includes('fresh') || section.subtitle?.toLowerCase().includes('hot');
+      {/* Dynamic Home Shelves/Sections */}
+      {sortedSections.length > 0 ? (
+        sortedSections.map((section, sIdx) => {
+          if (!section.items || section.items.length === 0) return null;
+
+          const songItems = section.items
+            .filter((it) => it.type === 'song')
+            .map(toTrack);
+
+          const isFresh = section.title.toLowerCase().includes('fresh') || section.title.toLowerCase().includes('new');
 
           return (
             <section key={section.title + sIdx}>
@@ -190,6 +218,29 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
       ) : (
         /* Fallback rendering if sections array is not present */
         <>
+          {/* Mixed for you */}
+          {feed?.mixedForYou && feed.mixedForYou.length > 0 && (
+            <section>
+              <div className="section-header">
+                <h2 className="section-title">Mixed for you</h2>
+                <span className="section-show-all" onClick={() => onNavigate({ tab: 'search', query: 'mix' })}>
+                  Show all
+                </span>
+              </div>
+              <div className="cards-grid">
+                {feed.mixedForYou.slice(0, 6).map((mix) => (
+                  <AlbumCard 
+                    key={mix.id} 
+                    album={mix} 
+                    onSelectAlbum={(m) => {
+                      onNavigate({ tab: 'album', album: { id: m.id, title: m.title, artist: m.artist, thumbnailUrl: m.thumbnailUrl, year: m.year, tracks: [] } });
+                    }}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Quick Picks */}
           {feed?.quickPicks && feed.quickPicks.length > 0 && (
             <section>
@@ -207,29 +258,6 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                     trackList={feed.quickPicks}
                     onOpenDetail={(t) => {
                       onNavigate({ tab: 'album', album: { id: '', title: t.title, artist: t.artist, thumbnailUrl: t.thumbnailUrl, tracks: [] } });
-                    }}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Mixed for you */}
-          {feed?.mixedForYou && feed.mixedForYou.length > 0 && (
-            <section>
-              <div className="section-header">
-                <h2 className="section-title">Mixed for you</h2>
-                <span className="section-show-all" onClick={() => onNavigate({ tab: 'search', query: 'mix' })}>
-                  Show all
-                </span>
-              </div>
-              <div className="cards-grid">
-                {feed.mixedForYou.slice(0, 6).map((mix) => (
-                  <AlbumCard 
-                    key={mix.id} 
-                    album={mix} 
-                    onSelectAlbum={(m) => {
-                      onNavigate({ tab: 'album', album: { id: m.id, title: m.title, artist: m.artist, thumbnailUrl: m.thumbnailUrl, year: m.year, tracks: [] } });
                     }}
                   />
                 ))}
@@ -286,7 +314,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         </>
       )}
 
-      {/* Moods & Genres (Directly from YouTube Music explore) */}
+      {/* Moods & Genres */}
       {feed?.moodAndGenres && feed.moodAndGenres.length > 0 && (
         <section>
           <div className="section-header">
@@ -322,5 +350,3 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
     </div>
   );
 };
-
-

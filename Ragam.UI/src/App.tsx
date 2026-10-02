@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { UpdateModal } from './components/UpdateModal';
 import { Header } from './components/Header';
@@ -20,10 +20,18 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<NavigationTarget[]>([{ tab: 'home' }]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  const scrollPositionsRef = useRef<Map<number, number>>(new Map());
+  const contentAreaRef = useRef<HTMLElement | null>(null);
 
   const currentTarget = history[currentIndex] || { tab: 'home' };
 
   const navigateTo = (target: NavigationTarget) => {
+    // Save current scroll position of the current page before navigating away
+    if (contentAreaRef.current) {
+      scrollPositionsRef.current.set(currentIndex, contentAreaRef.current.scrollTop);
+    }
+
     const newHistory = history.slice(0, currentIndex + 1);
     newHistory.push(target);
     setHistory(newHistory);
@@ -35,9 +43,30 @@ export const App: React.FC = () => {
 
   const handleGoBack = () => {
     if (currentIndex > 0) {
+      // Save current scroll position of the detail page
+      if (contentAreaRef.current) {
+        scrollPositionsRef.current.set(currentIndex, contentAreaRef.current.scrollTop);
+      }
       setCurrentIndex(currentIndex - 1);
     }
   };
+
+  // Restore scroll position whenever index or target changes
+  useLayoutEffect(() => {
+    const targetScroll = scrollPositionsRef.current.get(currentIndex) || 0;
+    if (contentAreaRef.current) {
+      contentAreaRef.current.scrollTop = targetScroll;
+    }
+
+    // Double-check with a frame tick in case components take a cycle to render
+    const frame = requestAnimationFrame(() => {
+      if (contentAreaRef.current) {
+        contentAreaRef.current.scrollTop = targetScroll;
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [currentIndex, currentTarget]);
 
   return (
     <PlayerProvider>
@@ -56,7 +85,7 @@ export const App: React.FC = () => {
               onGoBack={handleGoBack}
             />
 
-            <main className="content-area">
+            <main ref={contentAreaRef} className="content-area">
               {currentTarget.tab === 'home' && <HomePage onNavigate={navigateTo} />}
               {currentTarget.tab === 'search' && (
                 <SearchPage initialQuery={searchQuery} onNavigate={navigateTo} />
