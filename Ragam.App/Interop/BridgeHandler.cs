@@ -298,6 +298,15 @@ public class BridgeHandler
                         });
                         break;
 
+                    case "open_external_url":
+                        var extUrl = req.Payload.TryGetProperty("url", out var up) ? up.GetString() : "";
+                        if (!string.IsNullOrEmpty(extUrl))
+                        {
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(extUrl) { UseShellExecute = true });
+                        }
+                        responseData = new { success = true };
+                        break;
+
                     case "window_close":
                         _window.Dispatcher.Invoke(() => _window.Close());
                         break;

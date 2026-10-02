@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Search, Library, Plus, Heart, History, ListMusic } from 'lucide-react';
+import { Home, Library, Plus, Heart, History, ListMusic } from 'lucide-react';
 import type { NavigationTarget, Playlist } from '../types';
 import { bridge } from '../services/bridge';
 
@@ -53,14 +53,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
         >
           <Home size={22} />
           <span>Home</span>
-        </div>
-
-        <div
-          className={`sidebar-item ${isCurrent('search') ? 'active' : ''}`}
-          onClick={() => onNavigate({ tab: 'search' })}
-        >
-          <Search size={22} />
-          <span>Search</span>
         </div>
       </div>
 
@@ -167,6 +159,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
             </div>
           ))}
         </div>
+      </div>
+    
+      {/* Sidebar Footer */}
+      <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border-subtle)', fontSize: '12px', color: 'var(--text-subdued)', display: 'flex', alignItems: 'center', gap: '5px', userSelect: 'none' }}>
+        <span>Created with music by</span>
+        <a href="https://hanialziya-portfolio.vercel.app" onClick={(e) => { e.preventDefault(); bridge.openExternalUrl('https://hanialziya-portfolio.vercel.app'); }} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 700, cursor: 'pointer' }} onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}>Hani</a>
       </div>
     </aside>
   );

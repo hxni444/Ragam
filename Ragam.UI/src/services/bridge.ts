@@ -195,6 +195,14 @@ class NativeBridge {
     });
   }
 
+  public openExternalUrl(url: string): void {
+    if (this.isNativeAvailable) {
+      this.send('open_external_url', { url }).catch(() => { window.open(url, '_blank', 'noopener,noreferrer'); });
+    } else {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
   public windowMinimize(): void {
     if (this.isNativeAvailable) {
       this.send('window_minimize');

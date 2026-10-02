@@ -36,6 +36,7 @@ public partial class MainWindow : Window
             );
 
             await MainWebView.EnsureCoreWebView2Async(env);
+            MainWebView.CoreWebView2.NewWindowRequested += (s, args) => { args.Handled = true; try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(args.Uri) { UseShellExecute = true }); } catch { } };
 
             _bridgeHandler = new BridgeHandler(
                 this,
