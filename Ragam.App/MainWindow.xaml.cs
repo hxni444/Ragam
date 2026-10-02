@@ -1,5 +1,6 @@
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using Velune.Desktop.App.Data;
@@ -31,12 +32,15 @@ public partial class MainWindow : Window
     {
         try
         {
-            var env = await CoreWebView2Environment.CreateAsync(
-                userDataFolder: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VeluneDesktop", "WebViewProfile")
-            );
+            var userDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ragam", "WebViewProfile");
+            var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataDir);
 
             await MainWebView.EnsureCoreWebView2Async(env);
-            MainWebView.CoreWebView2.NewWindowRequested += (s, args) => { args.Handled = true; try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(args.Uri) { UseShellExecute = true }); } catch { } };
+            MainWebView.CoreWebView2.NewWindowRequested += (s, args) =>
+            {
+                args.Handled = true;
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(args.Uri) { UseShellExecute = true }); } catch { }
+            };
 
             _bridgeHandler = new BridgeHandler(
                 this,
@@ -58,55 +62,92 @@ public partial class MainWindow : Window
                 }
             };
 
-            // Check if Vite Dev Server is running
-            bool isDevServerRunning = await CheckDevServerAsync("http://localhost:5173");
+            string? targetDistPath = GetUiContentPath();
 
-            if (isDevServerRunning)
+            if (targetDistPath != null && Directory.Exists(targetDistPath))
             {
-                MainWebView.CoreWebView2.Navigate("http://localhost:5173");
+                MainWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "ragam.local",
+                    targetDistPath,
+                    CoreWebView2HostResourceAccessKind.Allow
+                );
+                MainWebView.CoreWebView2.Navigate("https://ragam.local/index.html");
             }
             else
             {
-                // In production, map local folder to virtual host
-                var distPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot");
-                if (!Directory.Exists(distPath))
-                {
-                    // Fallback to dev UI folder if not yet published
-                    distPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Velune.Desktop.UI", "dist"));
-                }
-
-                if (Directory.Exists(distPath))
-                {
-                    MainWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                        "velune.local",
-                        distPath,
-                        CoreWebView2HostResourceAccessKind.Allow
-                    );
-                    MainWebView.CoreWebView2.Navigate("https://velune.local/index.html");
-                }
-                else
-                {
-                    MainWebView.CoreWebView2.NavigateToString("<h1>Velune Desktop</h1><p>Starting UI...</p>");
-                }
+                MainWebView.CoreWebView2.NavigateToString("<body style=\"background:#000;color:#FF5400;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;\"><h1>RAGAM</h1></body>");
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to initialize WebView2: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Failed to initialize WebView2: {ex.Message}", "RAGAM Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private static async Task<bool> CheckDevServerAsync(string url)
+    private string? GetUiContentPath()
+    {
+        // 1. Check folder next to the .exe
+        var directPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot");
+        if (Directory.Exists(directPath) && File.Exists(Path.Combine(directPath, "index.html")))
+        {
+            return directPath;
+        }
+
+        // 2. Check dev UI path if in local development
+        var devPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Ragam.UI", "dist"));
+        if (Directory.Exists(devPath) && File.Exists(Path.Combine(devPath, "index.html")))
+        {
+            return devPath;
+        }
+
+        // 3. Extract embedded resources to LocalAppData/Ragam/wwwroot
+        var appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ragam", "wwwroot");
+        ExtractEmbeddedResources(appDataDir);
+        if (Directory.Exists(appDataDir) && File.Exists(Path.Combine(appDataDir, "index.html")))
+        {
+            return appDataDir;
+        }
+
+        return null;
+    }
+
+    private void ExtractEmbeddedResources(string targetDir)
     {
         try
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
-            var response = await client.GetAsync(url);
-            return response.IsSuccessStatusCode;
+            var assembly = Assembly.GetExecutingAssembly();
+            var resourceNames = assembly.GetManifestResourceNames();
+            var prefix = "Ragam.wwwroot.";
+
+            Directory.CreateDirectory(targetDir);
+            Directory.CreateDirectory(Path.Combine(targetDir, "assets"));
+
+            foreach (var name in resourceNames)
+            {
+                if (!name.StartsWith(prefix)) continue;
+
+                var relative = name.Substring(prefix.Length);
+                string filePath;
+                if (relative.StartsWith("assets."))
+                {
+                    var fileName = relative.Substring("assets.".Length);
+                    filePath = Path.Combine(targetDir, "assets", fileName);
+                }
+                else
+                {
+                    filePath = Path.Combine(targetDir, relative);
+                }
+
+                using var stream = assembly.GetManifestResourceStream(name);
+                if (stream != null)
+                {
+                    using var fileStream = File.Create(filePath);
+                    stream.CopyTo(fileStream);
+                }
+            }
         }
         catch
         {
-            return false;
         }
     }
 
