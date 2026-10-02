@@ -1,0 +1,27 @@
+<Window x:Class="Velune.Desktop.App.YouTubeLoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Sign in with YouTube Music - Layam"
+        Height="720" Width="480"
+        WindowStartupLocation="CenterOwner"
+        Background="#121212"
+        Foreground="#FFFFFF">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Top Header Bar -->
+        <Border Grid.Row="0" Background="#181818" BorderBrush="#282828" BorderThickness="0,0,0,1" Padding="16,12">
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Sign in to YouTube Music" FontWeight="Bold" FontSize="16" Foreground="#FFFFFF"/>
+                <TextBlock Text="Sign in with your Google account to sync your exact recommendations, playlists, and mixes." FontSize="12" Foreground="#A0A0A0" Margin="0,4,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- WebView2 for Google / YouTube Music Auth -->
+        <wv2:WebView2 x:Name="AuthWebView" Grid.Row="1"/>
+    </Grid>
+</Window>

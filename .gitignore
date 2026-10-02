@@ -1,0 +1,21 @@
+# Visual Studio / .NET
+.vs/
+bin/
+obj/
+*.user
+*.suo
+
+# Node / UI
+node_modules/
+dist/
+.vite/
+
+# SQLite / Local DBs
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
