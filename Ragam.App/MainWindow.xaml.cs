@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly LyricsService _lyricsService = new();
     private readonly DatabaseService _databaseService = new();
     private readonly DiscordRpcService _discordService = new();
+    private readonly UpdateService _updateService = new();
 
     public MainWindow()
     {
@@ -50,7 +51,8 @@ public partial class MainWindow : Window
                 _innerTubeService,
                 _lyricsService,
                 _databaseService,
-                _discordService
+                _discordService,
+                _updateService
             );
 
             MainWebView.CoreWebView2.WebMessageReceived += async (s, args) =>

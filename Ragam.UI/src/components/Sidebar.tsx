@@ -162,9 +162,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
       </div>
     
       {/* Sidebar Footer */}
-      <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border-subtle)', fontSize: '12px', color: 'var(--text-subdued)', display: 'flex', alignItems: 'center', gap: '5px', userSelect: 'none' }}>
-        <span>Created with music by</span>
-        <a href="https://hanialziya-portfolio.vercel.app" onClick={(e) => { e.preventDefault(); bridge.openExternalUrl('https://hanialziya-portfolio.vercel.app'); }} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 700, cursor: 'pointer' }} onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}>Hani</a>
+      <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border-subtle)', fontSize: '12px', color: 'var(--text-subdued)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span>Created with music by</span>
+          <a href="https://hanialziya-portfolio.vercel.app" onClick={(e) => { e.preventDefault(); bridge.openExternalUrl('https://hanialziya-portfolio.vercel.app'); }} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 700, cursor: 'pointer' }} onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}>Hani</a>
+        </div>
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: 700,
+            color: 'var(--text-subdued)',
+            background: 'rgba(255, 255, 255, 0.06)',
+            padding: '2px 7px',
+            borderRadius: '4px',
+            letterSpacing: '0.3px'
+          }}
+          title="RAGAM v1.0.0"
+        >
+          v1.0.0
+        </span>
       </div>
     </aside>
   );

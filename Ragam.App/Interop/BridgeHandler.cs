@@ -26,6 +26,7 @@ public class BridgeHandler
     private readonly LyricsService _lyricsService;
     private readonly DatabaseService _databaseService;
     private readonly DiscordRpcService _discordService;
+    private readonly UpdateService _updateService;
     private readonly AuthService _authService = new();
     private readonly Window _window;
     private readonly WebView2 _webView;
@@ -38,7 +39,8 @@ public class BridgeHandler
         InnerTubeService innerTubeService,
         LyricsService lyricsService,
         DatabaseService databaseService,
-        DiscordRpcService discordService)
+        DiscordRpcService discordService,
+        UpdateService updateService)
     {
         _window = window;
         _webView = webView;
@@ -48,10 +50,25 @@ public class BridgeHandler
         _lyricsService = lyricsService;
         _databaseService = databaseService;
         _discordService = discordService;
+        _updateService = updateService;
     }
 
     private static HomeFeedDto? _cachedHomeFeed;
     private static DateTime _cachedHomeFeedTime = DateTime.MinValue;
+
+        private void SendEvent(string eventName, object payload)
+    {
+        try
+        {
+            var eventObj = new { isEvent = true, eventName, payload };
+            var json = JsonSerializer.Serialize(eventObj);
+            _window.Dispatcher.Invoke(() =>
+            {
+                _webView.CoreWebView2.PostWebMessageAsJson(json);
+            });
+        }
+        catch { }
+    }
 
     public async Task HandleMessageAsync(string jsonMessage)
     {
@@ -296,7 +313,21 @@ public class BridgeHandler
                         responseData = new { success = deleted };
                         break;
 
-                                        case "window_drag":
+                                                            case "check_for_updates":
+                        var updateInfo = await _updateService.CheckForUpdatesAsync();
+                        responseData = updateInfo;
+                        break;
+
+                    case "install_update":
+                        var dlUrl = req.Payload.TryGetProperty("downloadUrl", out var dl) ? dl.GetString() ?? "" : "";
+                        var updateSuccess = await _updateService.DownloadAndApplyUpdateAsync(dlUrl, (progress) =>
+                        {
+                            SendEvent("update_progress", new { progress });
+                        });
+                        responseData = new { success = updateSuccess };
+                        break;
+
+                    case "window_drag":
                         _window.Dispatcher.Invoke(() =>
                         {
                             var helper = new WindowInteropHelper(_window);

@@ -1,3 +1,12 @@
+export interface UpdateInfo {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseNotes: string;
+  downloadUrl: string;
+  publishedAt: string;
+}
+
 import type { Track, Lyrics, HomeFeed, Album, Artist, Playlist, SearchResult, AuthState } from '../types';
 
 declare global {
@@ -12,24 +21,29 @@ declare global {
   }
 }
 
-interface BridgeResponse<T = any> {
-  id: string;
-  success: boolean;
-  data: T;
-  error?: string;
-}
+
 
 class NativeBridge {
   private pendingRequests = new Map<string, { resolve: (data: any) => void; reject: (err: any) => void }>();
+  private eventListeners = new Map<string, Set<(payload: any) => void>>();
   private isNativeAvailable = false;
 
   constructor() {
     this.isNativeAvailable = typeof window !== 'undefined' && !!window.chrome?.webview;
 
     if (this.isNativeAvailable) {
-      window.chrome!.webview!.addEventListener('message', (event: any) => {
+            window.chrome!.webview!.addEventListener('message', (event: any) => {
         try {
-          const res: BridgeResponse = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          const res: any = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          if (res && res.isEvent && res.eventName) {
+            const listeners = this.eventListeners.get(res.eventName);
+            if (listeners) {
+              listeners.forEach((fn) => {
+                try { fn(res.payload); } catch (err) { console.error(err); }
+              });
+            }
+            return;
+          }
           if (res && res.id && this.pendingRequests.has(res.id)) {
             const { resolve, reject } = this.pendingRequests.get(res.id)!;
             this.pendingRequests.delete(res.id);
@@ -193,6 +207,26 @@ class NativeBridge {
       this.notifyLibraryChange();
       return res;
     });
+  }
+
+    public on(eventName: string, handler: (payload: any) => void): () => void {
+    if (!this.eventListeners.has(eventName)) {
+      this.eventListeners.set(eventName, new Set());
+    }
+    this.eventListeners.get(eventName)!.add(handler);
+    return () => this.off(eventName, handler);
+  }
+
+  public off(eventName: string, handler: (payload: any) => void): void {
+    this.eventListeners.get(eventName)?.delete(handler);
+  }
+
+  public checkForUpdates(): Promise<UpdateInfo> {
+    return this.send<UpdateInfo>('check_for_updates');
+  }
+
+  public installUpdate(downloadUrl: string): Promise<{ success: boolean }> {
+    return this.send<{ success: boolean }>('install_update', { downloadUrl });
   }
 
   public openExternalUrl(url: string): void {
