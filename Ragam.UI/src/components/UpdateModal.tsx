@@ -11,19 +11,31 @@ export const UpdateModal: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    // Check for updates 3 seconds after application startup
-    const timer = setTimeout(async () => {
-      try {
-        const info = await bridge.checkForUpdates();
-        if (info && info.hasUpdate) {
-          setUpdateInfo(info);
-          setIsOpen(true);
-        }
-      } catch (err) {
-        console.warn('Auto-update check failed:', err);
+  const runCheck = async (manual = false) => {
+    try {
+      const info = await bridge.checkForUpdates();
+      if (info && info.hasUpdate) {
+        setUpdateInfo(info);
+        setIsOpen(true);
+      } else if (manual) {
+        // Broadcast that app is up to date
+        window.dispatchEvent(new CustomEvent('update_checked', { detail: { upToDate: true } }));
       }
-    }, 3000);
+    } catch (err: any) {
+      console.warn('Update check failed:', err);
+    }
+  };
+
+  useEffect(() => {
+    // Initial check after 2 seconds
+    const initialTimer = setTimeout(() => runCheck(false), 2000);
+
+    // Periodic check every 2 minutes
+    const interval = setInterval(() => runCheck(false), 120000);
+
+    // Listen for manual trigger from Sidebar or Header
+    const handleManualCheck = () => runCheck(true);
+    window.addEventListener('check_for_updates_manual', handleManualCheck);
 
     // Listen for download progress from backend
     const unsubscribe = bridge.on('update_progress', (payload: { progress: number }) => {
@@ -33,7 +45,9 @@ export const UpdateModal: React.FC = () => {
     });
 
     return () => {
-      clearTimeout(timer);
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+      window.removeEventListener('check_for_updates_manual', handleManualCheck);
       unsubscribe();
     };
   }, []);

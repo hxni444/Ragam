@@ -12,6 +12,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
 
   const loadPlaylists = () => {
     bridge.getPlaylists().then(setPlaylists).catch(console.error);
@@ -24,6 +25,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
     });
     return () => unsub();
   }, []);
+
+    useEffect(() => {
+    const handleChecked = (e: any) => {
+      
+      if (e.detail?.upToDate) {
+        setUpdateStatus('Up to date!');
+        setTimeout(() => setUpdateStatus(null), 3000);
+      }
+    };
+    window.addEventListener('update_checked', handleChecked);
+    return () => window.removeEventListener('update_checked', handleChecked);
+  }, []);
+
+  const triggerUpdateCheck = () => {
+    
+    setUpdateStatus('Checking...');
+    window.dispatchEvent(new CustomEvent('check_for_updates_manual'));
+    setTimeout(() => {
+      
+      setUpdateStatus((prev) => prev === 'Checking...' ? null : prev);
+    }, 4000);
+  };
 
   const handleCreatePlaylist = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,18 +191,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
           <a href="https://hanialziya-portfolio.vercel.app" onClick={(e) => { e.preventDefault(); bridge.openExternalUrl('https://hanialziya-portfolio.vercel.app'); }} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 700, cursor: 'pointer' }} onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')} onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}>Hani</a>
         </div>
         <span
+          onClick={triggerUpdateCheck}
           style={{
             fontSize: '11px',
             fontWeight: 700,
-            color: 'var(--text-subdued)',
-            background: 'rgba(255, 255, 255, 0.06)',
+            color: updateStatus ? '#FF5400' : 'var(--text-subdued)',
+            background: updateStatus ? 'rgba(255, 84, 0, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+            border: updateStatus ? '1px solid rgba(255, 84, 0, 0.3)' : '1px solid transparent',
             padding: '2px 7px',
             borderRadius: '4px',
-            letterSpacing: '0.3px'
+            letterSpacing: '0.3px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
           }}
-          title="RAGAM v1.0.2"
+          title="Click to check for updates"
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'; }}
+          onMouseLeave={(e) => { 
+            e.currentTarget.style.color = updateStatus ? '#FF5400' : 'var(--text-subdued)';
+            e.currentTarget.style.background = updateStatus ? 'rgba(255, 84, 0, 0.15)' : 'rgba(255, 255, 255, 0.06)';
+          }}
         >
-          v1.0.2
+          {updateStatus || 'v1.0.2'}
         </span>
       </div>
     </aside>
