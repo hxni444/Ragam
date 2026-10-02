@@ -1,5 +1,7 @@
 import React from 'react';
 import { 
+  X, 
+  ChevronUp, 
   Play, 
   Pause, 
   SkipBack, 
@@ -41,7 +43,10 @@ export const PlayerBar: React.FC = () => {
     prevTrack,
     toggleFavorite,
     setIsLyricsOpen,
-    setIsQueueOpen
+    setIsQueueOpen,
+    closePlayer,
+    toggleExpanded,
+    isExpanded
   } = usePlayer();
 
   if (!currentTrack) return null;
@@ -62,15 +67,21 @@ export const PlayerBar: React.FC = () => {
   };
 
   return (
-    <footer className="playerbar">
+    <footer className={`playerbar ${isExpanded ? "hidden-expanded" : ""}`}>
+
       {/* Left: Track Information */}
       <div className="player-track-info">
-        <img 
-          src={currentTrack.thumbnailUrl} 
-          alt={currentTrack.title} 
-          className="player-thumb" 
-        />
-        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ position: 'relative', cursor: 'pointer' }} onClick={toggleExpanded} title="Expand player (^) (Now Playing)">
+          <img 
+            src={currentTrack.thumbnailUrl} 
+            alt={currentTrack.title} 
+            className="player-thumb" 
+          />
+          <div className="player-expand-hover-badge">
+            <ChevronUp size={16} color="#fff" />
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer' }} onClick={toggleExpanded} title="Expand player (^)">
           <span className="player-title" title={currentTrack.title}>
             {currentTrack.title}
           </span>
@@ -78,7 +89,10 @@ export const PlayerBar: React.FC = () => {
             {currentTrack.artist}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '4px' }}>
+        <button className="control-btn" onClick={toggleExpanded} title="Expand Now Playing (^)" style={{ opacity: 0.75, padding: '4px' }}>
+          <ChevronUp size={18} />
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '2px' }}>
           <button 
             className="control-btn" 
             onClick={toggleFavorite}
@@ -181,6 +195,17 @@ export const PlayerBar: React.FC = () => {
             style={{ width: '80px', accentColor: 'var(--primary)', cursor: 'pointer', height: '4px' }}
           />
         </div>
+
+        <button 
+          className="control-btn" 
+          onClick={closePlayer}
+          title="Close player"
+          style={{ marginLeft: '4px', opacity: 0.7 }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.7')}
+        >
+          <X size={17} />
+        </button>
       </div>
     </footer>
   );

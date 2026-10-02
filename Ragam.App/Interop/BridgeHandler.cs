@@ -379,6 +379,7 @@ public class BridgeHandler
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Bridge error: {ex}");
+
         }
     }
 }

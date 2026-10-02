@@ -12,6 +12,8 @@ interface HeaderProps {
   searchQuery: string;
   canGoBack: boolean;
   onGoBack: () => void;
+  canGoForward?: boolean;
+  onGoForward?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -19,7 +21,9 @@ export const Header: React.FC<HeaderProps> = ({
   onSearch, 
   searchQuery, 
   canGoBack, 
-  onGoBack 
+  onGoBack,
+  canGoForward = false,
+  onGoForward
 }) => {
   const [authState, setAuthState] = useState<AuthState>({ isLoggedIn: false });
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -63,7 +67,13 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <ChevronLeft size={20} />
           </button>
-          <button className="arrow-btn" style={{ opacity: 0.4, cursor: 'default' }}>
+          <button 
+            className="arrow-btn" 
+            onClick={onGoForward} 
+            disabled={!canGoForward}
+            style={{ opacity: canGoForward ? 1 : 0.4, cursor: canGoForward ? 'pointer' : 'default' }}
+            title="Go forward"
+          >
             <ChevronRight size={20} />
           </button>
         </div>

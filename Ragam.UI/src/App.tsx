@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
 import { SyncedLyricsView } from './components/SyncedLyricsView';
+import { NowPlayingView } from './components/NowPlayingView';
 import { QueueDrawer } from './components/QueueDrawer';
 import { HomePage } from './pages/HomePage';
 import { SearchPage } from './pages/SearchPage';
@@ -43,13 +44,80 @@ export const App: React.FC = () => {
 
   const handleGoBack = () => {
     if (currentIndex > 0) {
-      // Save current scroll position of the detail page
       if (contentAreaRef.current) {
         scrollPositionsRef.current.set(currentIndex, contentAreaRef.current.scrollTop);
       }
-      setCurrentIndex(currentIndex - 1);
+      setCurrentIndex((prev) => Math.max(prev - 1, 0));
     }
   };
+
+  const handleGoForward = () => {
+    if (currentIndex < history.length - 1) {
+      if (contentAreaRef.current) {
+        scrollPositionsRef.current.set(currentIndex, contentAreaRef.current.scrollTop);
+      }
+      setCurrentIndex((prev) => Math.min(prev + 1, history.length - 1));
+    }
+  };
+
+  // Trackpad 2-finger horizontal swipe gesture & Mouse Back/Forward navigation
+  React.useEffect(() => {
+    let lastSwipeTime = 0;
+    let accumulatedDeltaX = 0;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Check for horizontal swipe gesture (dominant horizontal movement)
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.2 && Math.abs(e.deltaX) > 15) {
+        accumulatedDeltaX += e.deltaX;
+        const now = Date.now();
+
+        if (now - lastSwipeTime > 500) {
+          if (accumulatedDeltaX < -40) {
+            handleGoBack();
+            lastSwipeTime = now;
+            accumulatedDeltaX = 0;
+          } else if (accumulatedDeltaX > 40) {
+            handleGoForward();
+            lastSwipeTime = now;
+            accumulatedDeltaX = 0;
+          }
+        }
+      } else {
+        accumulatedDeltaX = 0;
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      // Mouse button 3 is Back, button 4 is Forward
+      if (e.button === 3) {
+        e.preventDefault();
+        handleGoBack();
+      } else if (e.button === 4) {
+        e.preventDefault();
+        handleGoForward();
+      }
+    };
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleGoBack();
+      } else if (e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleGoForward();
+      }
+    };
+
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('keydown', handleGlobalKeyDown);
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, [currentIndex, history.length]);
 
   // Restore scroll position whenever index or target changes
   useLayoutEffect(() => {
@@ -83,6 +151,8 @@ export const App: React.FC = () => {
               searchQuery={searchQuery}
               canGoBack={currentIndex > 0}
               onGoBack={handleGoBack}
+              canGoForward={currentIndex < history.length - 1}
+              onGoForward={handleGoForward}
             />
 
             <main ref={contentAreaRef} className="content-area">
@@ -116,6 +186,7 @@ export const App: React.FC = () => {
         </div>
 
         <PlayerBar />
+        <NowPlayingView />
         <UpdateModal />
       </div>
     </PlayerProvider>

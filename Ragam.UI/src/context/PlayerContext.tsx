@@ -17,6 +17,7 @@ interface PlayerContextType {
   lyrics: Lyrics | null;
   isLyricsOpen: boolean;
   isQueueOpen: boolean;
+  isExpanded: boolean;
   isFavorite: boolean;
   playTrack: (track: Track, newQueue?: Track[]) => Promise<void>;
   togglePlay: () => void;
@@ -30,7 +31,10 @@ interface PlayerContextType {
   toggleFavorite: () => Promise<void>;
   setIsLyricsOpen: (val: boolean) => void;
   setIsQueueOpen: (val: boolean) => void;
+  setIsExpanded: (val: boolean) => void;
+  toggleExpanded: () => void;
   addToQueue: (track: Track) => void;
+  closePlayer: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -50,6 +54,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [lyrics, setLyrics] = useState<Lyrics | null>(null);
   const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [isQueueOpen, setIsQueueOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -387,9 +392,196 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsFavorite(res.isFavorite);
   };
 
+  
+  const toggleExpanded = () => setIsExpanded((prev) => !prev);
+
+  const closePlayer = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
+      audioRef.current.currentTime = 0;
+    }
+    setCurrentTrack(null);
+    currentTrackRef.current = null;
+    setIsPlaying(false);
+    setIsLoading(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsLyricsOpen(false);
+    setIsQueueOpen(false);
+    setIsExpanded(false);
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'none';
+      navigator.mediaSession.metadata = null;
+    }
+  };
+
   const addToQueue = (track: Track) => {
     setQueue((prev) => [...prev, track]);
   };
+
+  
+  // 1. Sync with System Media Transport Controls (SMTC) & Function / Media Keys
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+
+    if (currentTrack) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        album: currentTrack.album || 'RAGAM',
+        artwork: currentTrack.thumbnailUrl
+          ? [
+              { src: currentTrack.thumbnailUrl, sizes: '96x96', type: 'image/jpeg' },
+              { src: currentTrack.thumbnailUrl, sizes: '128x128', type: 'image/jpeg' },
+              { src: currentTrack.thumbnailUrl, sizes: '256x256', type: 'image/jpeg' },
+              { src: currentTrack.thumbnailUrl, sizes: '512x512', type: 'image/jpeg' }
+            ]
+          : []
+      });
+    } else {
+      navigator.mediaSession.metadata = null;
+    }
+
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
+    navigator.mediaSession.setActionHandler('play', () => {
+      if (audioRef.current && currentTrackRef.current) {
+        audioRef.current.play().catch(console.error);
+      }
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      prevTrackInternal();
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      nextTrackInternal();
+    });
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime !== undefined && audioRef.current) {
+        audioRef.current.currentTime = details.seekTime;
+        setCurrentTime(details.seekTime);
+      }
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+      const skipTime = details.seekOffset || 10;
+      if (audioRef.current) {
+        const t = Math.max(audioRef.current.currentTime - skipTime, 0);
+        audioRef.current.currentTime = t;
+        setCurrentTime(t);
+      }
+    });
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+      const skipTime = details.seekOffset || 10;
+      if (audioRef.current) {
+        const t = Math.min(audioRef.current.currentTime + skipTime, audioRef.current.duration || 0);
+        audioRef.current.currentTime = t;
+        setCurrentTime(t);
+      }
+    });
+    navigator.mediaSession.setActionHandler('stop', () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+    });
+  }, [currentTrack, isPlaying]);
+
+  // 2. Global Keyboard Shortcuts & Function Keys
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const isInput = tag === 'input' || tag === 'textarea' || target?.isContentEditable;
+      if (isInput) return;
+
+      // Play / Pause (Media key, Space, or 'k')
+      if (e.key === 'Escape') {
+        setIsExpanded(false);
+      } else if (e.code === 'MediaPlayPause' || e.code === 'Space' || e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        togglePlay();
+      }
+      // Next track (Media key, Shift+ArrowRight, or 'N')
+      else if (e.code === 'MediaTrackNext' || (e.shiftKey && e.code === 'ArrowRight') || (e.shiftKey && (e.key === 'n' || e.key === 'N'))) {
+        e.preventDefault();
+        nextTrackInternal();
+      }
+      // Previous track (Media key, Shift+ArrowLeft, or 'P')
+      else if (e.code === 'MediaTrackPrevious' || (e.shiftKey && e.code === 'ArrowLeft') || (e.shiftKey && (e.key === 'p' || e.key === 'P'))) {
+        e.preventDefault();
+        prevTrackInternal();
+      }
+      // Stop
+      else if (e.code === 'MediaStop') {
+        e.preventDefault();
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+      }
+      // Seek Backward 5s (ArrowLeft or 'j')
+      else if (e.code === 'ArrowLeft' || e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        if (audioRef.current) {
+          const t = Math.max(audioRef.current.currentTime - 5, 0);
+          audioRef.current.currentTime = t;
+          setCurrentTime(t);
+        }
+      }
+      // Seek Forward 5s (ArrowRight or 'l' without modifier)
+      else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        if (audioRef.current) {
+          const t = Math.min(audioRef.current.currentTime + 5, audioRef.current.duration || 0);
+          audioRef.current.currentTime = t;
+          setCurrentTime(t);
+        }
+      }
+      // Volume Up (+5%)
+      else if (e.code === 'ArrowUp') {
+        e.preventDefault();
+        setVolumeState((v) => {
+          const nv = Math.min(Number((v + 0.05).toFixed(2)), 1);
+          if (audioRef.current) audioRef.current.volume = nv;
+          setIsMuted(false);
+          return nv;
+        });
+      }
+      // Volume Down (-5%)
+      else if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        setVolumeState((v) => {
+          const nv = Math.max(Number((v - 0.05).toFixed(2)), 0);
+          if (audioRef.current) audioRef.current.volume = nv;
+          return nv;
+        });
+      }
+      // Mute Toggle ('m')
+      else if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        toggleMute();
+      }
+      // Lyrics Toggle ('l')
+      else if (e.key === 'l' || e.key === 'L') {
+        e.preventDefault();
+        setIsLyricsOpen((prev) => !prev);
+      }
+      // Queue Toggle ('q')
+      else if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault();
+        setIsQueueOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay, toggleMute]);
 
   return (
     <PlayerContext.Provider
@@ -421,7 +613,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleFavorite,
         setIsLyricsOpen,
         setIsQueueOpen,
-        addToQueue
+        addToQueue,
+        closePlayer,
+        isExpanded,
+        setIsExpanded,
+        toggleExpanded
       }}
     >
       {children}

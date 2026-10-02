@@ -19,3 +19,7 @@ dist/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Release artifacts
+release/*.pdb
+release/*.xml

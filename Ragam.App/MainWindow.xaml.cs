@@ -37,6 +37,8 @@ public partial class MainWindow : Window
             var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataDir);
 
             await MainWebView.EnsureCoreWebView2Async(env);
+            MainWebView.CoreWebView2.Settings.IsSwipeNavigationEnabled = true;
+            MainWebView.CoreWebView2.Settings.IsPinchZoomEnabled = true;
             MainWebView.CoreWebView2.NewWindowRequested += (s, args) =>
             {
                 args.Handled = true;
