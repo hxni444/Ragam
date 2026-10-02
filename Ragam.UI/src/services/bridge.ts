@@ -203,6 +203,12 @@ class NativeBridge {
     }
   }
 
+    public windowDrag(): void {
+    if (this.isNativeAvailable) {
+      this.send('window_drag');
+    }
+  }
+
   public windowMinimize(): void {
     if (this.isNativeAvailable) {
       this.send('window_minimize');

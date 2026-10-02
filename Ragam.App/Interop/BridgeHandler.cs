@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
@@ -9,6 +11,15 @@ namespace Velune.Desktop.App.Interop;
 
 public class BridgeHandler
 {
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+
+    private const int WM_NCLBUTTONDOWN = 0xA1;
+    private const int HT_CAPTION = 0x2;
+
     private readonly CoreWebView2Environment _env;
     private readonly YouTubeService _youTubeService;
     private readonly InnerTubeService _innerTubeService;
@@ -283,6 +294,15 @@ public class BridgeHandler
                         var delId = req.Payload.GetProperty("playlistId").GetString() ?? "";
                         var deleted = await _databaseService.DeletePlaylistAsync(delId);
                         responseData = new { success = deleted };
+                        break;
+
+                                        case "window_drag":
+                        _window.Dispatcher.Invoke(() =>
+                        {
+                            var helper = new WindowInteropHelper(_window);
+                            ReleaseCapture();
+                            SendMessage(helper.Handle, WM_NCLBUTTONDOWN, (IntPtr)HT_CAPTION, IntPtr.Zero);
+                        });
                         break;
 
                     case "window_minimize":

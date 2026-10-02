@@ -5,17 +5,26 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         mc:Ignorable="d"
-        Title="Velune Desktop" 
+        Title="RAGAM" 
         Height="800" 
         Width="1280"
         MinHeight="600"
         MinWidth="900"
         WindowStartupLocation="CenterScreen"
-        Background="#0b0b12"
+        Background="#000000"
         Foreground="#f8fafc"
         WindowStyle="None"
-        AllowsTransparency="False">
-    <Grid Background="#0b0b12">
-        <wv2:WebView2 Name="MainWebView" DefaultBackgroundColor="#0b0b12" />
+        AllowsTransparency="False"
+        ResizeMode="CanResize">
+    <WindowChrome.WindowChrome>
+        <WindowChrome 
+            CaptionHeight="0"
+            ResizeBorderThickness="6"
+            CornerRadius="0"
+            GlassFrameThickness="0"
+            UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+    <Grid Background="#000000">
+        <wv2:WebView2 Name="MainWebView" DefaultBackgroundColor="#000000" />
     </Grid>
 </Window>

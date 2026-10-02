@@ -3,9 +3,30 @@ import { Minus, Square, X } from 'lucide-react';
 import { bridge } from '../services/bridge';
 
 export const TitleBar: React.FC = () => {
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0) {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.titlebar-controls')) {
+        bridge.windowDrag();
+      }
+    }
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.titlebar-controls')) {
+      bridge.windowMaximize();
+    }
+  };
+
   return (
-    <div className="titlebar">
-      <div className="titlebar-brand" style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+    <div
+      className="titlebar"
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
+      style={{ userSelect: 'none', WebkitUserSelect: 'none', cursor: 'default' }}
+    >
+      <div className="titlebar-brand" style={{ display: 'flex', alignItems: 'center', height: '100%', pointerEvents: 'none' }}>
         <svg
           viewBox="0 0 1080 250"
           style={{ height: '18px', width: 'auto' }}
