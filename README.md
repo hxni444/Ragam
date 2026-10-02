@@ -80,5 +80,9 @@ dotnet run
 
 ---
 
-## 📄 License
-This project is open-source under the MIT License.
+## 📄 License & Terms of Use
+
+This project is licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+
+- ✅ **Permitted**: Personal use, learning, research, non-commercial modification, and contributions.
+- ❌ **Prohibited**: Any commercial use, selling, monetization, subscription gating, or financial gain derived from this software or its source code.
