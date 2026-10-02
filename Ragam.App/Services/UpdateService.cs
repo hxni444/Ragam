@@ -27,13 +27,13 @@ public class UpdateService
     public UpdateService()
     {
         _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Ragam-Desktop", "1.0.3"));
+        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Ragam-Desktop", "1.0.4"));
     }
 
     public string GetCurrentVersion()
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
-        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.3";
+        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "1.0.4";
     }
 
     public async Task<UpdateInfo> CheckForUpdatesAsync()
@@ -53,7 +53,59 @@ public class UpdateService
             string publishedAt = "";
             string downloadUrl = "";
 
-            // 1. Check all Git Tags first (always has the most up-to-date tags)
+            // 1. Check raw version.json & package.json (100% immune to GitHub API rate limits)
+            try
+            {
+                var rawVersionUrl = $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/main/version.json?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                using var rawResponse = await _httpClient.GetAsync(rawVersionUrl);
+                if (rawResponse.IsSuccessStatusCode)
+                {
+                    var rawJson = await rawResponse.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(rawJson);
+                    var root = doc.RootElement;
+                    var ver = root.TryGetProperty("version", out var vEl) ? vEl.GetString() ?? "" : "";
+                    var cleanVer = ver.TrimStart('v', 'V').Trim();
+
+                    if (!string.IsNullOrEmpty(cleanVer))
+                    {
+                        highestTag = cleanVer;
+                        releaseNotes = root.TryGetProperty("notes", out var nEl) ? nEl.GetString() ?? "" : "";
+                        downloadUrl = root.TryGetProperty("downloadUrl", out var dEl) ? dEl.GetString() ?? "" : "";
+                        publishedAt = root.TryGetProperty("publishedAt", out var pEl) ? pEl.GetString() ?? "" : "";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error checking raw version.json: {ex.Message}");
+            }
+
+            // 1b. Fallback to raw package.json if version.json wasn't found
+            if (string.IsNullOrEmpty(highestTag))
+            {
+                try
+                {
+                    var rawPkgUrl = $"https://raw.githubusercontent.com/{RepoOwner}/{RepoName}/main/Ragam.UI/package.json?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                    using var pkgResponse = await _httpClient.GetAsync(rawPkgUrl);
+                    if (pkgResponse.IsSuccessStatusCode)
+                    {
+                        var pkgJson = await pkgResponse.Content.ReadAsStringAsync();
+                        using var doc = JsonDocument.Parse(pkgJson);
+                        var ver = doc.RootElement.TryGetProperty("version", out var vEl) ? vEl.GetString() ?? "" : "";
+                        var cleanVer = ver.TrimStart('v', 'V').Trim();
+                        if (!string.IsNullOrEmpty(cleanVer))
+                        {
+                            highestTag = cleanVer;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error checking raw package.json: {ex.Message}");
+                }
+            }
+
+            // 2. Check Git Tags via API if available
             try
             {
                 var tagsUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/tags";
@@ -84,7 +136,7 @@ public class UpdateService
                 Debug.WriteLine($"Error checking tags: {ex.Message}");
             }
 
-            // 2. Check official GitHub Release for notes & assets
+            // 3. Check official GitHub Release for notes & assets
             try
             {
                 var releasesUrl = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
@@ -106,8 +158,14 @@ public class UpdateService
                         }
                     }
 
-                    releaseNotes = root.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() ?? "" : "";
-                    publishedAt = root.TryGetProperty("published_at", out var pubEl) ? pubEl.GetString() ?? "" : "";
+                    if (string.IsNullOrEmpty(releaseNotes))
+                    {
+                        releaseNotes = root.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() ?? "" : "";
+                    }
+                    if (string.IsNullOrEmpty(publishedAt))
+                    {
+                        publishedAt = root.TryGetProperty("published_at", out var pubEl) ? pubEl.GetString() ?? "" : "";
+                    }
 
                     if (root.TryGetProperty("assets", out var assetsEl) && assetsEl.ValueKind == JsonValueKind.Array)
                     {
@@ -116,7 +174,8 @@ public class UpdateService
                             var name = asset.TryGetProperty("name", out var nameEl) ? nameEl.GetString() ?? "" : "";
                             if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                             {
-                                downloadUrl = asset.TryGetProperty("browser_download_url", out var dlEl) ? dlEl.GetString() ?? "" : "";
+                                var assetDl = asset.TryGetProperty("browser_download_url", out var dlEl) ? dlEl.GetString() ?? "" : "";
+                                if (!string.IsNullOrEmpty(assetDl)) downloadUrl = assetDl;
                                 break;
                             }
                         }
