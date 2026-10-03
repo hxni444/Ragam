@@ -1,12 +1,12 @@
 # 🎵 RAGAM
 
-A modern, fast, subscription-free YouTube Music desktop player built with **.NET 8 (C#)**, **Microsoft WebView2**, and **React 18 (TypeScript)**.
+A modern, fast, subscription-free desktop music player built with **.NET 8 (C#)**, **Microsoft WebView2**, and **React 19 (TypeScript)**.
 
 ---
 
 ## 📥 Download RAGAM for Windows
 
-Get the latest version of RAGAM instantly. Auto-updates will keep you up to date automatically.
+Get the latest version of RAGAM instantly. Built-in auto-updates will keep your player fresh automatically.
 
 | Package | Download Link | Description |
 | :--- | :--- | :--- |
@@ -19,13 +19,13 @@ Get the latest version of RAGAM instantly. Auto-updates will keep you up to date
 
 ## ✨ Key Features
 
-- 🎧 **Ad-Free & High-Fidelity Audio**: Direct Opus/AAC audio stream playback straight from YouTube Music CDNs with zero ads.
-- 🎤 **Synchronized Lyrics**: Real-time karaoke-style word highlights and line-by-line scrolling lyrics powered by LRCLIB and YouTube transcripts.
+- 🎧 **Ad-Free & High-Fidelity Audio**: Crystal clear high-fidelity audio playback with zero interruptions or ads.
+- 🎤 **Synchronized Lyrics**: Real-time karaoke-style word highlights and line-by-line scrolling lyrics.
 - 🎨 **Sleek Custom UI**: Dark glassmorphic design system in theme orange (`#FF5400`), smooth Framer Motion micro-interactions, and a custom frameless window with native Aero Snap support.
 - 📋 **Library & Offline Playlists**: Manage favorites, custom playlists, and local listening history stored in a local-first SQLite database.
 - 🔄 **Automatic Self-Updates**: Built-in delta updates powered by Velopack that download in seconds without manual reinstalls.
 - 🎮 **Discord Rich Presence**: Live "Listening to..." activity status on Discord with song titles, artists, and live album art.
-- 🚀 **100% Standalone Executable**: Self-contained single-file `.exe` with embedded UI assets — zero installation or dependencies required.
+- 🚀 **100% Standalone Executable**: Self-contained single-file `.exe` with embedded UI assets — zero installation or external dependencies required.
 
 ---
 
@@ -37,11 +37,11 @@ Ragam/
 │   ├── Data/                  # Local SQLite DbContext (Favorites, History, Playlists)
 │   ├── Interop/               # BridgeHandler (Bidirectional WebMessage IPC between React & C#)
 │   ├── Models/                # Track, Playlist, Album, and Lyrics Data Models
-│   ├── Services/              # YouTubeService, InnerTubeService, LyricsService, UpdateService, DiscordRpcService
+│   ├── Services/              # Audio, Lyrics, Update, and Discord RPC Services
 │   ├── MainWindow.xaml        # Borderless WindowChrome host for WebView2
 │   └── app.ico                # Custom multi-resolution app icon
 │
-├── Ragam.UI/                   # React 18 + Vite + TypeScript Frontend
+├── Ragam.UI/                   # React 19 + Vite + TypeScript Frontend
 │   ├── src/
 │   │   ├── components/        # PlayerBar, SyncedLyricsView, QueueDrawer, Sidebar, TitleBar, AuthModal
 │   │   ├── context/           # PlayerContext & State Management
