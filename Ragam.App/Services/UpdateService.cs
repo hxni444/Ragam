@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Velopack;
 using Velopack.Sources;
@@ -10,8 +12,8 @@ namespace Ragam.App.Services;
 public class UpdateInfo
 {
     public bool HasUpdate { get; set; }
-    public string CurrentVersion { get; set; } = "2.0.4";
-    public string LatestVersion { get; set; } = "2.0.4";
+    public string CurrentVersion { get; set; } = "2.0.6";
+    public string LatestVersion { get; set; } = "2.0.6";
     public string ReleaseNotes { get; set; } = "";
     public string DownloadUrl { get; set; } = "";
     public string PublishedAt { get; set; } = "";
@@ -54,7 +56,7 @@ public class UpdateService
         catch { }
 
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "2.0.4";
+        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "2.0.6";
     }
 
     public async Task<UpdateInfo> CheckForUpdatesAsync()
@@ -72,7 +74,7 @@ public class UpdateService
         try
         {
             var mgr = CreateManager();
-            Log($"Velopack IsInstalled: {mgr.IsInstalled}, AppId: {mgr.AppId}");
+            Log($"Updater IsInstalled: {mgr.IsInstalled}, AppId: {mgr.AppId}");
 
             if (!mgr.IsInstalled)
             {
@@ -86,7 +88,7 @@ public class UpdateService
             {
                 info.HasUpdate = true;
                 info.LatestVersion = _velopackUpdate.TargetFullRelease.Version.ToFullString();
-                info.ReleaseNotes = "RAGAM v" + info.LatestVersion + " is ready to install via Velopack.";
+                info.ReleaseNotes = await FetchReleaseNotesAsync(info.LatestVersion);
                 Log($"Update AVAILABLE! Target: {info.LatestVersion}, Deltas: {_velopackUpdate.DeltasToTarget?.Length ?? 0}");
             }
             else
@@ -100,6 +102,43 @@ public class UpdateService
         }
 
         return info;
+    }
+
+    private static async Task<string> FetchReleaseNotesAsync(string version)
+    {
+        try
+        {
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("RagamApp/2.0");
+            client.Timeout = TimeSpan.FromSeconds(5);
+            var url = $"https://api.github.com/repos/hxni444/Ragam/releases/tags/v{version}";
+            var json = await client.GetStringAsync(url);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("body", out var bodyEl) && !string.IsNullOrWhiteSpace(bodyEl.GetString()))
+            {
+                var raw = bodyEl.GetString()!;
+                // Filter out any Velopack / packaging / checksum lines
+                var lines = raw.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                var cleanLines = lines
+                    .Where(l => !l.Contains("velopack", StringComparison.OrdinalIgnoreCase))
+                    .Where(l => !l.Contains("velpack", StringComparison.OrdinalIgnoreCase))
+                    .Where(l => !l.Contains(".nupkg", StringComparison.OrdinalIgnoreCase))
+                    .Where(l => !l.Contains("sha256", StringComparison.OrdinalIgnoreCase))
+                    .Where(l => !l.Contains("checksum", StringComparison.OrdinalIgnoreCase))
+                    .Where(l => !l.Contains("vpk ", StringComparison.OrdinalIgnoreCase))
+                    .Where(l => !l.StartsWith("---", StringComparison.Ordinal))
+                    .ToList();
+
+                var cleanText = string.Join("\n", cleanLines).Trim();
+                if (!string.IsNullOrWhiteSpace(cleanText))
+                {
+                    return cleanText;
+                }
+            }
+        }
+        catch { }
+
+        return "• Full screen and player bar layout improvements\n• Added shuffle play option to all playlists & albums\n• Preserved playback position & playlist queue when restarting\n• Stable home feed recommendations caching\n• Audio streaming and UI performance optimizations";
     }
 
     public async Task<bool> DownloadAndApplyUpdateAsync(string downloadUrl, Action<int>? progressCallback = null)

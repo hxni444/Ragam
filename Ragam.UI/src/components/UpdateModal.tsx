@@ -183,21 +183,65 @@ export const UpdateModal: React.FC = () => {
           style={{
             background: 'rgba(255, 255, 255, 0.03)',
             borderRadius: '10px',
-            padding: '12px 14px',
+            padding: '14px 16px',
             border: '1px solid var(--border-subtle)',
-            maxHeight: '130px',
+            maxHeight: '160px',
             overflowY: 'auto',
             fontSize: '13px',
-            lineHeight: '1.5',
-            color: 'var(--text-muted)'
+            lineHeight: '1.6',
+            color: 'var(--text-subdued)'
           }}
         >
-          <div style={{ fontWeight: 600, color: '#fff', marginBottom: '4px' }}>What's New:</div>
-          {updateInfo.releaseNotes ? (
-            <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{updateInfo.releaseNotes}</p>
-          ) : (
-            <p style={{ margin: 0 }}>This release includes performance optimizations, bug fixes, and latest UI improvements.</p>
-          )}
+          <div style={{ fontWeight: 700, color: '#fff', marginBottom: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ color: '#FF5400' }}>✦</span>
+            <span>What's New in this update:</span>
+          </div>
+          {(() => {
+            const rawNotes = updateInfo.releaseNotes || '';
+            const filteredLines = rawNotes
+              .split('\n')
+              .map((l) => l.trim())
+              .filter((l) => l.length > 0)
+              .filter((l) => !l.toLowerCase().includes('velopack') && !l.toLowerCase().includes('velpack') && !l.toLowerCase().includes('.nupkg') && !l.toLowerCase().includes('sha256'));
+
+            if (filteredLines.length === 0) {
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <span style={{ color: '#FF5400', fontWeight: 800 }}>•</span>
+                    <span style={{ color: '#e0e0e0' }}>Player full screen layout and view fixes</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <span style={{ color: '#FF5400', fontWeight: 800 }}>•</span>
+                    <span style={{ color: '#e0e0e0' }}>Shuffle play option on all playlists & library</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <span style={{ color: '#FF5400', fontWeight: 800 }}>•</span>
+                    <span style={{ color: '#e0e0e0' }}>Persistent song and queue state across app launches</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <span style={{ color: '#FF5400', fontWeight: 800 }}>•</span>
+                    <span style={{ color: '#e0e0e0' }}>Stable home recommendations caching</span>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {filteredLines.map((line, idx) => {
+                  const clean = line.replace(/^[#*\-•\s]+/, '').trim();
+                  if (!clean) return null;
+                  return (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <span style={{ color: '#FF5400', fontWeight: 800, flexShrink: 0 }}>•</span>
+                      <span style={{ color: '#e0e0e0' }}>{clean}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Progress Bar during update */}

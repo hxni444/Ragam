@@ -1,6 +1,6 @@
 import { AddToLibraryMenu } from '../components/AddToLibraryMenu';
 import React, { useState, useEffect } from 'react';
-import { Play, Clock } from 'lucide-react';
+import { Play, Shuffle, Clock } from 'lucide-react';
 import type { Album, Track } from '../types';
 import { usePlayer } from '../context/PlayerContext';
 import { TrackRow } from '../components/TrackRow';
@@ -96,6 +96,35 @@ export const AlbumDetailPage: React.FC<AlbumDetailPageProps> = ({ album }) => {
           title="Play album"
         >
           <Play size={24} fill="#000" color="#000" style={{ transform: 'translateX(2px)' }} />
+        </button>
+
+        <button
+          onClick={() => {
+            if (tracks && tracks.length > 0) {
+              const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+              playTrack(shuffled[0], shuffled);
+            }
+          }}
+          disabled={loading || tracks.length === 0}
+          className="control-btn"
+          style={{
+            height: '44px',
+            padding: '0 20px',
+            borderRadius: '500px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#ffffff',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: loading || tracks.length === 0 ? 'not-allowed' : 'pointer'
+          }}
+          title="Shuffle Play"
+        >
+          <Shuffle size={18} color="var(--primary)" />
+          <span>Shuffle</span>
         </button>
 
         <AddToLibraryMenu 

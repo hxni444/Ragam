@@ -24,7 +24,7 @@
             GlassFrameThickness="0"
             UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
-    <Grid Background="#000000">
+    <Grid Name="MainGrid" Background="#000000">
         <wv2:WebView2 Name="MainWebView" DefaultBackgroundColor="#000000" />
     </Grid>
 </Window>

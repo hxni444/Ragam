@@ -11,24 +11,34 @@ interface HomePageProps {
 
 const DEFAULT_CHIPS = ['All', 'Energize', 'Workout', 'Relax', 'Focus', 'Commute', 'Party'];
 
-// In-memory module cache to immediately render cached feed and preserve scroll position
-let cachedFeed: HomeFeed | null = null;
+// In-memory module cache to immediately render cached feed and preserve cards during navigation
+const cachedChipFeeds = new Map<string, HomeFeed>();
 let cachedChip = 'All';
 
-
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
-  const [feed, setFeed] = useState<HomeFeed | null>(cachedFeed);
-  const [loading, setLoading] = useState(!cachedFeed);
   const [selectedChip, setSelectedChip] = useState(cachedChip);
+  const initialFeed = cachedChipFeeds.get(selectedChip) || cachedChipFeeds.get('All') || null;
+  const [feed, setFeed] = useState<HomeFeed | null>(initialFeed);
+  const [loading, setLoading] = useState(!initialFeed);
 
-  const loadFeed = async (chipParams?: string, isChipSwitch = false) => {
+  const loadFeed = async (chipTitle: string, chipParams?: string, force = false) => {
+    const existing = cachedChipFeeds.get(chipTitle);
+    if (existing && !force) {
+      setFeed(existing);
+      setLoading(false);
+      return;
+    }
+
     try {
-      if (!cachedFeed || isChipSwitch) {
-        setLoading(true);
+      setLoading(true);
+      const data = await bridge.getHomeFeed(force, chipParams);
+      if (data) {
+        cachedChipFeeds.set(chipTitle, data);
+        if (chipTitle === 'All') {
+          cachedChipFeeds.set('__main__', data);
+        }
+        setFeed(data);
       }
-      const data = await bridge.getHomeFeed(true, chipParams);
-      cachedFeed = data;
-      setFeed(data);
     } catch (err) {
       console.error('Failed to load home feed:', err);
     } finally {
@@ -37,24 +47,26 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
   };
 
   useEffect(() => {
-    loadFeed(selectedChip !== 'All' ? selectedChip : undefined);
+    const cached = cachedChipFeeds.get(selectedChip) || cachedChipFeeds.get('All');
+    if (!cached) {
+      loadFeed('All', undefined);
+    } else {
+      setFeed(cached);
+      setLoading(false);
+    }
   }, []);
 
   const handleChipClick = async (chipTitle: string, chipParams?: string) => {
     if (selectedChip === chipTitle && chipTitle !== 'All') {
       setSelectedChip('All');
       cachedChip = 'All';
-      await loadFeed(undefined, true);
+      await loadFeed('All', undefined);
       return;
     }
 
     setSelectedChip(chipTitle);
     cachedChip = chipTitle;
-    if (chipTitle === 'All') {
-      await loadFeed(undefined, true);
-    } else {
-      await loadFeed(chipParams, true);
-    }
+    await loadFeed(chipTitle, chipTitle === 'All' ? undefined : chipParams);
   };
 
   const toTrack = (item: HomeSectionItem): Track => ({

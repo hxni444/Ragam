@@ -1,6 +1,6 @@
 import { AddToLibraryMenu } from '../components/AddToLibraryMenu';
 import React, { useState, useEffect } from 'react';
-import { Play, ListMusic, Trash2, Clock } from 'lucide-react';
+import { Play, Shuffle, ListMusic, Trash2, Clock } from 'lucide-react';
 import type { Playlist, NavigationTarget } from '../types';
 import { usePlayer } from '../context/PlayerContext';
 import { TrackRow } from '../components/TrackRow';
@@ -142,6 +142,35 @@ export const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist
           title="Play playlist"
         >
           <Play size={24} fill="#000" color="#000" style={{ transform: 'translateX(2px)' }} />
+        </button>
+
+        <button
+          onClick={() => {
+            if (playlist.tracks && playlist.tracks.length > 0) {
+              const shuffled = [...playlist.tracks].sort(() => Math.random() - 0.5);
+              playTrack(shuffled[0], shuffled);
+            }
+          }}
+          disabled={!playlist.tracks || playlist.tracks.length === 0}
+          className="control-btn"
+          style={{
+            height: '44px',
+            padding: '0 20px',
+            borderRadius: '500px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#ffffff',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: !playlist.tracks || playlist.tracks.length === 0 ? 'not-allowed' : 'pointer'
+          }}
+          title="Shuffle Play"
+        >
+          <Shuffle size={18} color="var(--primary)" />
+          <span>Shuffle</span>
         </button>
 
         {playlist.tracks && playlist.tracks.length > 0 && (

@@ -114,25 +114,51 @@ export const LibraryPage: React.FC<LibraryPageProps> = ({ initialTab = 'all', on
         </div>
 
         {activeTab !== 'playlists' && currentTracks.length > 0 && (
-          <button
-            onClick={() => playTrack(currentTracks[0], currentTracks)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'var(--primary)',
-              border: 'none',
-              borderRadius: '500px',
-              padding: '8px 20px',
-              color: '#000',
-              fontWeight: 700,
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
-          >
-            <Play size={14} fill="#000" />
-            <span>Play All</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={() => playTrack(currentTracks[0], currentTracks)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'var(--primary)',
+                border: 'none',
+                borderRadius: '500px',
+                padding: '8px 20px',
+                color: '#000',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px var(--primary-glow)'
+              }}
+            >
+              <Play size={14} fill="#000" />
+              <span>Play All</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const shuffled = [...currentTracks].sort(() => Math.random() - 0.5);
+                playTrack(shuffled[0], shuffled);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.18)',
+                borderRadius: '500px',
+                padding: '8px 18px',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer'
+              }}
+            >
+              <span style={{ display: 'inline-flex', transform: 'scale(0.9)' }}>🔀</span>
+              <span>Shuffle</span>
+            </button>
+          </div>
         )}
       </div>
 

@@ -58,10 +58,9 @@ public class BridgeHandler
         _updateService = updateService;
     }
 
-    private static HomeFeedDto? _cachedHomeFeed;
-    private static DateTime _cachedHomeFeedTime = DateTime.MinValue;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, HomeFeedDto> _cachedChipFeeds = new();
 
-        private void SendEvent(string eventName, object payload)
+    private void SendEvent(string eventName, object payload)
     {
         try
         {
@@ -98,9 +97,11 @@ public class BridgeHandler
                             ? pProp.GetString()
                             : null;
 
-                        if (!forceRefresh && string.IsNullOrEmpty(feedParams) && _cachedHomeFeed != null && (DateTime.UtcNow - _cachedHomeFeedTime).TotalMinutes < 15)
+                        var cacheKey = string.IsNullOrEmpty(feedParams) ? "__main__" : feedParams;
+
+                        if (!forceRefresh && _cachedChipFeeds.TryGetValue(cacheKey, out var existingFeed))
                         {
-                            responseData = _cachedHomeFeed;
+                            responseData = existingFeed;
                             break;
                         }
 
@@ -123,10 +124,9 @@ public class BridgeHandler
                             feed = await _youTubeService.GetHomeFeedAsync(topArtists);
                         }
 
-                        if (feed != null && string.IsNullOrEmpty(feedParams))
+                        if (feed != null)
                         {
-                            _cachedHomeFeed = feed;
-                            _cachedHomeFeedTime = DateTime.UtcNow;
+                            _cachedChipFeeds[cacheKey] = feed;
                         }
 
                         responseData = feed;
@@ -392,6 +392,7 @@ public class BridgeHandler
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Bridge error: {ex}");
+
 
 
         }

@@ -58,7 +58,7 @@ export const ArtistDetailPage: React.FC<ArtistDetailPageProps> = ({ artist }) =>
       </div>
 
       {/* Action Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '8px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '8px 0' }}>
         <button
           onClick={handlePlayArtist}
           disabled={loading || tracks.length === 0}
@@ -83,6 +83,35 @@ export const ArtistDetailPage: React.FC<ArtistDetailPageProps> = ({ artist }) =>
           title={`Play ${artist.name}`}
         >
           <Play size={24} fill="#000" color="#000" style={{ transform: 'translateX(1px)' }} />
+        </button>
+
+        <button
+          onClick={() => {
+            if (tracks && tracks.length > 0) {
+              const shuffled = [...tracks].sort(() => Math.random() - 0.5);
+              playTrack(shuffled[0], shuffled);
+            }
+          }}
+          disabled={loading || tracks.length === 0}
+          className="control-btn"
+          style={{
+            height: '44px',
+            padding: '0 20px',
+            borderRadius: '500px',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.18)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            color: '#ffffff',
+            fontWeight: 700,
+            fontSize: '13px',
+            cursor: loading || tracks.length === 0 ? 'not-allowed' : 'pointer'
+          }}
+          title="Shuffle Play"
+        >
+          <span style={{ display: 'inline-flex', transform: 'scale(0.9)' }}>🔀</span>
+          <span>Shuffle</span>
         </button>
       </div>
 
