@@ -88,7 +88,17 @@ public class UpdateService
             {
                 info.HasUpdate = true;
                 info.LatestVersion = _velopackUpdate.TargetFullRelease.Version.ToFullString();
-                info.ReleaseNotes = await FetchReleaseNotesAsync(info.LatestVersion);
+
+                var embeddedNotes = _velopackUpdate.TargetFullRelease.NotesMarkdown;
+                if (!string.IsNullOrWhiteSpace(embeddedNotes))
+                {
+                    info.ReleaseNotes = CleanNotes(embeddedNotes);
+                }
+                else
+                {
+                    info.ReleaseNotes = await FetchReleaseNotesAsync(info.LatestVersion);
+                }
+
                 Log($"Update AVAILABLE! Target: {info.LatestVersion}, Deltas: {_velopackUpdate.DeltasToTarget?.Length ?? 0}");
             }
             else
@@ -104,6 +114,32 @@ public class UpdateService
         return info;
     }
 
+    private static string CleanNotes(string raw)
+    {
+        try
+        {
+            var lines = raw.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var cleanLines = lines
+                .Where(l => !l.Contains("velopack", StringComparison.OrdinalIgnoreCase))
+                .Where(l => !l.Contains("velpack", StringComparison.OrdinalIgnoreCase))
+                .Where(l => !l.Contains(".nupkg", StringComparison.OrdinalIgnoreCase))
+                .Where(l => !l.Contains("sha256", StringComparison.OrdinalIgnoreCase))
+                .Where(l => !l.Contains("checksum", StringComparison.OrdinalIgnoreCase))
+                .Where(l => !l.Contains("vpk ", StringComparison.OrdinalIgnoreCase))
+                .Where(l => !l.StartsWith("---", StringComparison.Ordinal))
+                .ToList();
+
+            var cleanText = string.Join("\n", cleanLines).Trim();
+            if (!string.IsNullOrWhiteSpace(cleanText))
+            {
+                return cleanText;
+            }
+        }
+        catch { }
+
+        return "• Full screen and player bar layout improvements\n• Added shuffle play option to all playlists & albums\n• Preserved playback position & playlist queue when restarting\n• Stable home feed recommendations caching\n• Audio streaming and UI performance optimizations";
+    }
+
     private static async Task<string> FetchReleaseNotesAsync(string version)
     {
         try
@@ -116,24 +152,7 @@ public class UpdateService
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.TryGetProperty("body", out var bodyEl) && !string.IsNullOrWhiteSpace(bodyEl.GetString()))
             {
-                var raw = bodyEl.GetString()!;
-                // Filter out any Velopack / packaging / checksum lines
-                var lines = raw.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-                var cleanLines = lines
-                    .Where(l => !l.Contains("velopack", StringComparison.OrdinalIgnoreCase))
-                    .Where(l => !l.Contains("velpack", StringComparison.OrdinalIgnoreCase))
-                    .Where(l => !l.Contains(".nupkg", StringComparison.OrdinalIgnoreCase))
-                    .Where(l => !l.Contains("sha256", StringComparison.OrdinalIgnoreCase))
-                    .Where(l => !l.Contains("checksum", StringComparison.OrdinalIgnoreCase))
-                    .Where(l => !l.Contains("vpk ", StringComparison.OrdinalIgnoreCase))
-                    .Where(l => !l.StartsWith("---", StringComparison.Ordinal))
-                    .ToList();
-
-                var cleanText = string.Join("\n", cleanLines).Trim();
-                if (!string.IsNullOrWhiteSpace(cleanText))
-                {
-                    return cleanText;
-                }
+                return CleanNotes(bodyEl.GetString()!);
             }
         }
         catch { }

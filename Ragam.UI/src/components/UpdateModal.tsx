@@ -202,7 +202,11 @@ export const UpdateModal: React.FC = () => {
               .split('\n')
               .map((l) => l.trim())
               .filter((l) => l.length > 0)
-              .filter((l) => !l.toLowerCase().includes('velopack') && !l.toLowerCase().includes('velpack') && !l.toLowerCase().includes('.nupkg') && !l.toLowerCase().includes('sha256'));
+              .filter((l) => !l.toLowerCase().includes('velopack') 
+                          && !l.toLowerCase().includes('velpack') 
+                          && !l.toLowerCase().includes('.nupkg') 
+                          && !l.toLowerCase().includes('sha256')
+                          && !l.toLowerCase().includes('ready to install'));
 
             if (filteredLines.length === 0) {
               return (
