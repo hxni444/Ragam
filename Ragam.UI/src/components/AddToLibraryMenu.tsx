@@ -1,3 +1,31 @@
+
+export const isSameTrack = (t1?: Track, t2?: Track): boolean => {
+  if (!t1 || !t2) return false;
+  if (t1.id && t2.id && t1.id === t2.id) return true;
+
+  const cleanDecoration = (str: string) => {
+    return (str || '')
+      .toLowerCase()
+      .replace(/\s*[([{\-]\s*(official\s*(music\s*)?video|official\s*audio|visualizer|lyric\s*video|lyrics|4k|hd|hq|audio|video|full\s*song)\s*[)\]}]/gi, '')
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const title1 = cleanDecoration(t1.title);
+  const title2 = cleanDecoration(t2.title);
+
+  if (title1 && title2 && title1 === title2) {
+    const artist1 = cleanDecoration(t1.artist || '');
+    const artist2 = cleanDecoration(t2.artist || '');
+    if (!artist1 || !artist2 || artist1 === artist2 || artist1.includes(artist2) || artist2.includes(artist1)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Heart, ListMusic, Check, Loader2 } from 'lucide-react';
 import type { Track, Playlist, Album, Artist } from '../types';
@@ -101,9 +129,9 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
         setPlaylists(pls);
 
         if (track) {
-          setIsFavorite(favs.some((f) => f.id === track.id));
+          setIsFavorite(favs.some((f) => isSameTrack(f, track)));
         } else if (currentTargetTracks.length > 0) {
-          setIsFavorite(currentTargetTracks.every((t) => favs.some((f) => f.id === t.id)));
+          setIsFavorite(currentTargetTracks.every((t) => favs.some((f) => isSameTrack(f, t))));
         }
       } catch (err) {
         console.error('Failed to load library data:', err);
@@ -137,7 +165,7 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
     try {
       if (resolvedTracks.length === 1) {
         const singleTrack = resolvedTracks[0];
-        const isInPlaylist = pl.tracks?.some((t) => t.id === singleTrack.id) || false;
+        const isInPlaylist = pl.tracks?.some((t) => isSameTrack(t, singleTrack)) || false;
         if (isInPlaylist) {
           await bridge.removeFromPlaylist(pl.id, singleTrack.id);
           setPlaylists((prev) =>
@@ -161,9 +189,9 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
         }
       } else if (resolvedTracks.length > 1) {
         let addedCount = 0;
-        const currentTrackIds = new Set((pl.tracks || []).map((t) => t.id));
+        const existingTracks = pl.tracks || [];
         for (const t of resolvedTracks) {
-          if (!currentTrackIds.has(t.id)) {
+          if (!existingTracks.some((et) => isSameTrack(et, t))) {
             await bridge.addTrackToPlaylist(pl.id, t);
             addedCount++;
           }

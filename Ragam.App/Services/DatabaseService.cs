@@ -6,6 +6,39 @@ namespace Ragam.App.Services;
 
 public class DatabaseService
 {
+
+    private static string CleanTitleDecoration(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return "";
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(
+            title,
+            @"\s*[([{\-]\s*(official\s*(music\s*)?video|official\s*audio|visualizer|lyric\s*video|lyrics|4k|hd|hq|audio|video|full\s*song)\s*[)\]}]",
+            "",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+        );
+        cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"[^\w\s]", "");
+        return System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ").Trim().ToLowerInvariant();
+    }
+
+    private static bool IsSameSong(PlaylistTrackEntity existing, TrackDto incoming)
+    {
+        if (existing.TrackId == incoming.Id) return true;
+
+        var t1 = CleanTitleDecoration(existing.Title);
+        var t2 = CleanTitleDecoration(incoming.Title);
+
+        if (!string.IsNullOrEmpty(t1) && t1 == t2)
+        {
+            var a1 = CleanTitleDecoration(existing.Artist);
+            var a2 = CleanTitleDecoration(incoming.Artist);
+            if (string.IsNullOrEmpty(a1) || string.IsNullOrEmpty(a2) || a1 == a2 || a1.Contains(a2) || a2.Contains(a1))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public async Task<List<TrackDto>> GetFavoritesAsync()
     {
         using var db = new AppDbContext();
@@ -130,7 +163,7 @@ public class DatabaseService
         if (playlist == null) return false;
 
         // Check if track already exists in the playlist to prevent duplicates
-        if (playlist.Tracks.Any(t => t.TrackId == track.Id))
+        if (playlist.Tracks.Any(t => IsSameSong(t, track)))
         {
             return true; // Already added
         }
