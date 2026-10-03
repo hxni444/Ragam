@@ -1,5 +1,6 @@
 using System.Text;
 using System.Windows;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Ragam.App.Services;
 
@@ -9,6 +10,7 @@ public partial class YouTubeLoginWindow : Window
 {
     private readonly CoreWebView2Environment _env;
     private readonly InnerTubeService _innerTubeService;
+    private DispatcherTimer? _cookieTimer;
     public bool LoginSuccessful { get; private set; }
     public event Action<bool>? LoginCompleted;
 
@@ -20,6 +22,7 @@ public partial class YouTubeLoginWindow : Window
         Loaded += YouTubeLoginWindow_Loaded;
         Closed += (s, e) =>
         {
+            _cookieTimer?.Stop();
             if (!LoginSuccessful)
             {
                 LoginCompleted?.Invoke(false);
@@ -39,6 +42,13 @@ public partial class YouTubeLoginWindow : Window
 
             AuthWebView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
             AuthWebView.CoreWebView2.SourceChanged += CoreWebView2_SourceChanged;
+
+            _cookieTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(1000)
+            };
+            _cookieTimer.Tick += (s, ev) => CheckForSuccessfulLogin();
+            _cookieTimer.Start();
 
             AuthWebView.CoreWebView2.Navigate("https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmusic.youtube.com");
         }
@@ -61,64 +71,69 @@ public partial class YouTubeLoginWindow : Window
 
     private async void CheckForSuccessfulLogin()
     {
-        if (AuthWebView.CoreWebView2 == null) return;
+        if (AuthWebView.CoreWebView2 == null || LoginSuccessful) return;
 
         var currentUri = AuthWebView.CoreWebView2.Source;
         if (string.IsNullOrEmpty(currentUri)) return;
 
-        if (currentUri.StartsWith("https://music.youtube.com", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            try
+            var cookieManager = AuthWebView.CoreWebView2.CookieManager;
+            var cookies = await cookieManager.GetCookiesAsync("https://music.youtube.com");
+            if (cookies == null || cookies.Count == 0)
             {
-                var cookieManager = AuthWebView.CoreWebView2.CookieManager;
-                var cookies = await cookieManager.GetCookiesAsync("https://music.youtube.com");
+                cookies = await cookieManager.GetCookiesAsync("https://www.youtube.com");
+            }
 
-                var sb = new StringBuilder();
-                bool hasAuthCookie = false;
+            var sb = new StringBuilder();
+            bool hasAuthCookie = false;
 
+            if (cookies != null)
+            {
                 foreach (var c in cookies)
                 {
                     sb.Append($"{c.Name}={c.Value}; ");
-                    if (c.Name == "SAPISID" || c.Name == "__Secure-3PAPISID" || c.Name == "SSID")
+                    if (c.Name == "SAPISID" || c.Name == "__Secure-3PAPISID" || c.Name == "SSID" || c.Name == "LOGIN_INFO")
                     {
                         hasAuthCookie = true;
                     }
                 }
-
-                if (hasAuthCookie)
-                {
-                    var cookieString = sb.ToString().TrimEnd(' ', ';');
-
-                    string? visitorData = null;
-                    string? dataSyncId = null;
-
-                    try
-                    {
-                        var vdRaw = await AuthWebView.CoreWebView2.ExecuteScriptAsync("window.yt && window.yt.config_ ? window.yt.config_.VISITOR_DATA : null");
-                        if (!string.IsNullOrEmpty(vdRaw) && vdRaw != "null")
-                        {
-                            visitorData = vdRaw.Trim('"');
-                        }
-
-                        var dsRaw = await AuthWebView.CoreWebView2.ExecuteScriptAsync("window.yt && window.yt.config_ ? window.yt.config_.DATASYNC_ID : null");
-                        if (!string.IsNullOrEmpty(dsRaw) && dsRaw != "null")
-                        {
-                            dataSyncId = dsRaw.Trim('"');
-                        }
-                    }
-                    catch { }
-
-                    await _innerTubeService.SaveSessionAsync(cookieString, visitorData, dataSyncId);
-
-                    LoginSuccessful = true;
-                    LoginCompleted?.Invoke(true);
-                    Close();
-                }
             }
-            catch (Exception ex)
+
+            if (hasAuthCookie)
             {
-                System.Diagnostics.Debug.WriteLine($"Error capturing YTM login cookies: {ex.Message}");
+                var cookieString = sb.ToString().TrimEnd(' ', ';');
+
+                string? visitorData = null;
+                string? dataSyncId = null;
+
+                try
+                {
+                    var vdRaw = await AuthWebView.CoreWebView2.ExecuteScriptAsync("window.yt && window.yt.config_ ? window.yt.config_.VISITOR_DATA : null");
+                    if (!string.IsNullOrEmpty(vdRaw) && vdRaw != "null")
+                    {
+                        visitorData = vdRaw.Trim('"');
+                    }
+
+                    var dsRaw = await AuthWebView.CoreWebView2.ExecuteScriptAsync("window.yt && window.yt.config_ ? window.yt.config_.DATASYNC_ID : null");
+                    if (!string.IsNullOrEmpty(dsRaw) && dsRaw != "null")
+                    {
+                        dataSyncId = dsRaw.Trim('"');
+                    }
+                }
+                catch { }
+
+                await _innerTubeService.SaveSessionAsync(cookieString, visitorData, dataSyncId);
+
+                LoginSuccessful = true;
+                _cookieTimer?.Stop();
+                LoginCompleted?.Invoke(true);
+                Close();
             }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error capturing YTM login cookies: {ex.Message}");
         }
     }
 }

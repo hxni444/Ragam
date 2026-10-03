@@ -82,12 +82,14 @@ class NativeBridge {
       }));
 
       // Timeout after 15 seconds
+            // Extended timeout for interactive actions (YouTube auth, update installation)
+      const timeoutMs = (action === 'login_youtube' || action === 'install_update') ? 600000 : 30000;
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
           reject(new Error(`Bridge request timed out: ${action}`));
         }
-      }, 15000);
+      }, timeoutMs);
     });
   }
 
