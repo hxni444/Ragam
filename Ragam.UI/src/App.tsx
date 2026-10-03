@@ -13,6 +13,8 @@ import { LibraryPage } from './pages/LibraryPage';
 import { AlbumDetailPage } from './pages/AlbumDetailPage';
 import { ArtistDetailPage } from './pages/ArtistDetailPage';
 import { PlaylistDetailPage } from './pages/PlaylistDetailPage';
+import { MoodCategoryPage } from './pages/MoodCategoryPage';
+import { ExploreMoodsPage } from './pages/ExploreMoodsPage';
 import { PlayerProvider } from './context/PlayerContext';
 import type { NavigationTarget } from './types';
 import './styles/index.css';
@@ -271,6 +273,12 @@ export const App: React.FC = () => {
               )}
               {currentTarget.tab === 'playlist' && (
                 <PlaylistDetailPage playlist={currentTarget.playlist} onNavigate={navigateTo} />
+              )}
+              {currentTarget.tab === 'mood' && (
+                <MoodCategoryPage mood={currentTarget.mood} onNavigate={navigateTo} />
+              )}
+              {currentTarget.tab === 'explore_moods' && (
+                <ExploreMoodsPage onNavigate={navigateTo} />
               )}
             </main>
           </div>

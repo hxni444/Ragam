@@ -117,4 +117,6 @@ export type NavigationTarget =
   | { tab: 'history' }
   | { tab: 'album'; album: Album }
   | { tab: 'artist'; artist: Artist }
-  | { tab: 'playlist'; playlist: Playlist };
+  | { tab: 'playlist'; playlist: Playlist }
+  | { tab: 'mood'; mood: MoodAndGenreItem }
+  | { tab: 'explore_moods' };

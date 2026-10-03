@@ -132,6 +132,78 @@ public class BridgeHandler
                         responseData = feed;
                         break;
 
+                    case "get_mood_category":
+                        var moodTitle = req.Payload.TryGetProperty("title", out var mtProp) ? mtProp.GetString() ?? "Mood" : "Mood";
+                        var moodParams = req.Payload.TryGetProperty("params", out var mpProp) ? mpProp.GetString() : null;
+                        var moodBrowseId = req.Payload.TryGetProperty("browseId", out var mbProp) ? mbProp.GetString() : null;
+
+                        HomeFeedDto? moodFeed = null;
+                        try
+                        {
+                            moodFeed = await _innerTubeService.GetMoodCategoryAsync(moodBrowseId, moodParams, moodTitle);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"InnerTube mood exception: {ex.Message}");
+                        }
+
+                        if (moodFeed == null || moodFeed.Sections == null || moodFeed.Sections.Count == 0)
+                        {
+                            // Fallback to YouTube service search
+                            var fallbackPlaylists = await _youTubeService.SearchPlaylistsOnlyAsync($"{moodTitle} playlists music", 18);
+                            var fallbackTracks = await _youTubeService.SearchVideosOnlyAsync($"{moodTitle} top songs", 12);
+
+                            var fallbackSections = new List<HomeSectionDto>();
+                            if (fallbackPlaylists.Count > 0)
+                            {
+                                fallbackSections.Add(new HomeSectionDto(
+                                    Title: $"{moodTitle} Playlists",
+                                    Subtitle: "Featured collections",
+                                    ThumbnailUrl: null,
+                                    Items: fallbackPlaylists.Select(p => new HomeSectionItemDto(
+                                        Type: "playlist",
+                                        Id: p.Id,
+                                        Title: p.Title,
+                                        Artist: p.Artist,
+                                        ThumbnailUrl: p.ThumbnailUrl,
+                                        Year: "Playlist"
+                                    )).ToList()
+                                ));
+                            }
+                            if (fallbackTracks.Count > 0)
+                            {
+                                fallbackSections.Add(new HomeSectionDto(
+                                    Title: $"Popular {moodTitle} Songs",
+                                    Subtitle: "Top tracks",
+                                    ThumbnailUrl: null,
+                                    Items: fallbackTracks.Select(t => new HomeSectionItemDto(
+                                        Type: "song",
+                                        Id: t.Id,
+                                        Title: t.Title,
+                                        Artist: t.Artist,
+                                        ThumbnailUrl: t.ThumbnailUrl,
+                                        DurationSeconds: t.DurationSeconds,
+                                        Tracks: new List<TrackDto> { t }
+                                    )).ToList()
+                                ));
+                            }
+
+                            moodFeed = new HomeFeedDto(
+                                TrendingSongs: fallbackTracks,
+                                PopularArtists: new List<ArtistDto>(),
+                                PopularAlbums: fallbackPlaylists,
+                                QuickPicks: fallbackTracks,
+                                Sections: fallbackSections
+                            );
+                        }
+
+                        responseData = moodFeed;
+                        break;
+
+                    case "get_explore_moods":
+                        responseData = await _innerTubeService.GetExploreMoodsAsync();
+                        break;
+
                     case "get_auth_state":
                         if (_innerTubeService.IsLoggedIn)
                         {

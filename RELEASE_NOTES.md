@@ -1,8 +1,8 @@
-﻿# RAGAM v2.0.6 Release Notes
+# RAGAM v2.0.7 Release Notes
 
 ### What's New
-- Fullscreen & Maximized Viewport: Fixed issue where the floating player bar was cut off when the window is maximized or full screen.
-- Shuffle Play for All Playlists: Added a dedicated Shuffle Play button to all playlists, albums, Liked Songs, and History.
-- Persistent Playback State: Restores the last playing song, playback timestamp, and active playlist queue upon app restart.
-- Stable Home Recommendations: Preserved home feed and category cards across tab/playlist navigation without re-fetching or shifting.
-- UI & Performance Enhancements: Faster audio stream loading, clean update notifications, and smoother animations.
+- **Moods & Genres Explorer**: Selecting any Mood or Genre pill (Malayalam, Chill, Energize, Gaming, Focus, Romance, etc.) now seamlessly opens a dedicated category page featuring curated playlists, mixes, albums, and songs.
+- **Home Feed Structure & Stability**: Fixed the issue where clicking mood pills would disrupt the home feed layout and require an app restart. Home shelves, chips, and recommendations now remain fully preserved.
+- **Explore All Categories View**: Added a full "Explore All" screen accessible from the Moods & genres section with fast instant filtering.
+- **Clean Category Header**: Streamlined category hero banner with vibrant color accents and responsive back navigation.
+- **Playback & Navigation Improvements**: Enhanced playlist opening, track switching, and preserved scroll positions.

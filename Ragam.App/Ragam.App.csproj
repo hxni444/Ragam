@@ -10,7 +10,7 @@
     <RootNamespace>Ragam</RootNamespace>
     <ApplicationTitle>RAGAM</ApplicationTitle>
     <Product>RAGAM</Product>
-    <Version>2.0.6</Version>
+    <Version>2.0.7</Version>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>

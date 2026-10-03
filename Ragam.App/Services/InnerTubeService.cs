@@ -460,6 +460,87 @@ public class InnerTubeService
         }
     }
 
+    public async Task<HomeFeedDto?> GetMoodCategoryAsync(string? browseId, string? paramsValue, string? categoryTitle = null)
+    {
+        try
+        {
+            var targetBrowseId = !string.IsNullOrEmpty(browseId) ? browseId : "FEmusic_moods_and_genres_category";
+            using var doc = await BrowseJsonAsync(targetBrowseId, paramsValue);
+            if (doc != null)
+            {
+                var (chips, sections, continuation) = ParseDynamicHomeFeed(doc.RootElement);
+
+                int pagesFetched = 0;
+                while (!string.IsNullOrEmpty(continuation) && pagesFetched < 3)
+                {
+                    pagesFetched++;
+                    try
+                    {
+                        using var contDoc = await BrowseJsonAsync(null, null, continuation);
+                        if (contDoc != null)
+                        {
+                            var (contSections, nextCont) = ParseContinuationSections(contDoc.RootElement);
+                            if (contSections.Count > 0)
+                            {
+                                sections.AddRange(contSections);
+                            }
+                            continuation = nextCont;
+                            if (contSections.Count == 0) break;
+                        }
+                        else break;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Continuation error in mood category: {ex.Message}");
+                        break;
+                    }
+                }
+
+                if (sections.Count > 0)
+                {
+                    return new HomeFeedDto(
+                        TrendingSongs: new List<TrackDto>(),
+                        PopularArtists: new List<ArtistDto>(),
+                        PopularAlbums: new List<AlbumDto>(),
+                        QuickPicks: new List<TrackDto>(),
+                        Chips: chips.Count > 0 ? chips : null,
+                        Sections: sections
+                    );
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error fetching mood category: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    public async Task<List<MoodAndGenreItemDto>> GetExploreMoodsAsync()
+    {
+        var list = new List<MoodAndGenreItemDto>();
+        try
+        {
+            using var doc = await BrowseJsonAsync("FEmusic_moods_and_genres");
+            if (doc != null)
+            {
+                list = ParseMoodAndGenres(doc.RootElement);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error fetching explore moods: {ex.Message}");
+        }
+
+        if (list.Count == 0)
+        {
+            list = GetDefaultMoodsAndGenres();
+        }
+
+        return list;
+    }
+
     private (List<HomeChipDto> chips, List<HomeSectionDto> sections, string? continuation) ParseDynamicHomeFeed(JsonElement root)
     {
         var chips = new List<HomeChipDto>();

@@ -317,7 +317,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
         <section>
           <div className="section-header">
             <h2 className="section-title">Moods & genres</h2>
-            <span className="section-show-all" onClick={() => onNavigate({ tab: 'search', query: 'moods genres' })}>
+            <span className="section-show-all" onClick={() => onNavigate({ tab: 'explore_moods' })}>
               Explore all
             </span>
           </div>
@@ -327,13 +327,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               <div 
                 key={mood.title} 
                 className="mood-btn"
-                onClick={() => {
-                  if (mood.params) {
-                    handleChipClick(mood.title, mood.params);
-                  } else {
-                    onNavigate({ tab: 'search', query: mood.title });
-                  }
-                }}
+                onClick={() => onNavigate({ tab: 'mood', mood })}
               >
                 <div 
                   className="mood-stripe" 

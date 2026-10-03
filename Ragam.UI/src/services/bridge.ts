@@ -25,7 +25,7 @@ declare global {
 
 
 class NativeBridge {
-  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.6';
+  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.7';
   private pendingRequests = new Map<string, { resolve: (data: any) => void; reject: (err: any) => void }>();
   private eventListeners = new Map<string, Set<(payload: any) => void>>();
   private isNativeAvailable = false;
@@ -104,6 +104,14 @@ class NativeBridge {
       this.cachedHomeFeed = feed;
     }
     return feed;
+  }
+
+  public getMoodCategory(title: string, params?: string, browseId?: string): Promise<HomeFeed> {
+    return this.send<HomeFeed>('get_mood_category', { title, params, browseId });
+  }
+
+  public getExploreMoods(): Promise<any[]> {
+    return this.send<any[]>('get_explore_moods');
   }
 
   public search(query: string): Promise<SearchResult> {
