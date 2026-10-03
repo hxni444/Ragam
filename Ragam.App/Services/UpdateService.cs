@@ -9,8 +9,8 @@ namespace Ragam.App.Services;
 public class UpdateInfo
 {
     public bool HasUpdate { get; set; }
-    public string CurrentVersion { get; set; } = "2.0.1";
-    public string LatestVersion { get; set; } = "2.0.1";
+    public string CurrentVersion { get; set; } = "2.0.2";
+    public string LatestVersion { get; set; } = "2.0.2";
     public string ReleaseNotes { get; set; } = "";
     public string DownloadUrl { get; set; } = "";
     public string PublishedAt { get; set; } = "";
@@ -46,7 +46,7 @@ public class UpdateService
         catch { }
 
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "2.0.1";
+        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "2.0.2";
     }
 
     public async Task<UpdateInfo> CheckForUpdatesAsync()
