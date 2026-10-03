@@ -322,7 +322,11 @@ public class BridgeHandler
                         responseData = new { success = deleted };
                         break;
 
-                                                            case "check_for_updates":
+                                                            case "get_app_version":
+                        responseData = new { version = _updateService.GetCurrentVersion() };
+                        break;
+
+                    case "check_for_updates":
                         var updateInfo = await _updateService.CheckForUpdatesAsync();
                         responseData = updateInfo;
                         break;

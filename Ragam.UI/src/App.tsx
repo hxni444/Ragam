@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
 import { SyncedLyricsView } from './components/SyncedLyricsView';
+import { NowPlayingView } from './components/NowPlayingView';
 import { QueueDrawer } from './components/QueueDrawer';
 import { HomePage } from './pages/HomePage';
 import { SearchPage } from './pages/SearchPage';
@@ -276,6 +277,7 @@ export const App: React.FC = () => {
 
           <QueueDrawer />
           <SyncedLyricsView />
+          <NowPlayingView />
         </div>
 
         <PlayerBar />

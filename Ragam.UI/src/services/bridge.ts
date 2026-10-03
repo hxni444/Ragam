@@ -1,3 +1,4 @@
+declare const __APP_VERSION__: string;
 export interface UpdateInfo {
   hasUpdate: boolean;
   currentVersion: string;
@@ -24,7 +25,7 @@ declare global {
 
 
 class NativeBridge {
-  public readonly appVersion: string = "2.0.1";
+  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.2';
   private pendingRequests = new Map<string, { resolve: (data: any) => void; reject: (err: any) => void }>();
   private eventListeners = new Map<string, Set<(payload: any) => void>>();
   private isNativeAvailable = false;
@@ -224,6 +225,22 @@ class NativeBridge {
 
   public off(eventName: string, handler: (payload: any) => void): void {
     this.eventListeners.get(eventName)?.delete(handler);
+  }
+
+  
+  public async getAppVersion(): Promise<string> {
+    if (this.isNativeAvailable) {
+      try {
+        const res = await this.send<{ version: string }>('get_app_version');
+        if (res && res.version) {
+          this.appVersion = res.version;
+          return res.version;
+        }
+      } catch (e) {
+        console.warn('Failed to get native app version:', e);
+      }
+    }
+    return this.appVersion;
   }
 
   public checkForUpdates(): Promise<UpdateInfo> {

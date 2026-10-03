@@ -13,6 +13,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
   const [isCreating, setIsCreating] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [currentVersion, setCurrentVersion] = useState<string>(bridge.appVersion);
+
+  useEffect(() => {
+    bridge.getAppVersion().then((v) => {
+      if (v) setCurrentVersion(v);
+    });
+  }, []);
 
   const loadPlaylists = () => {
     bridge.getPlaylists().then(setPlaylists).catch(console.error);
@@ -202,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
             e.currentTarget.style.background = updateStatus ? 'rgba(255, 84, 0, 0.15)' : 'rgba(255, 255, 255, 0.06)';
           }}
         >
-          {updateStatus || `v${bridge.appVersion}`}
+          {updateStatus || `v${currentVersion}`}
         </span>
       </div>
     </aside>
