@@ -6,14 +6,14 @@ A modern, fast, subscription-free desktop music player built with **.NET 8 (C#)*
 
 ## 📥 Download RAGAM for Windows
 
-Get the latest version of RAGAM instantly. Built-in auto-updates will keep your player fresh automatically.
+Get the latest version of RAGAM instantly. Built-in auto-updates will keep your player up to date automatically.
 
 | Package | Download Link | Description |
 | :--- | :--- | :--- |
 | **🚀 Windows Setup (Recommended)** | [**Download `Ragam-win-Setup.exe`**](https://github.com/hxni444/Ragam/raw/main/release/Ragam-win-Setup.exe) | One-click installer with automatic background updates & desktop shortcuts. |
 | **📦 Portable Edition (.zip)** | [**Download `Ragam-win-Portable.zip`**](https://github.com/hxni444/Ragam/raw/main/release/Ragam-win-Portable.zip) | No installation required. Unzip and run `Ragam.exe` anywhere. |
 
-> 💡 *You can also download individual releases from the [**GitHub Releases Page**](https://github.com/hxni444/Ragam/releases).*
+> 💡 *You can also download individual releases and delta packages directly from the [**GitHub Releases Page**](https://github.com/hxni444/Ragam/releases).*
 
 ---
 
@@ -21,9 +21,9 @@ Get the latest version of RAGAM instantly. Built-in auto-updates will keep your 
 
 - 🎧 **Ad-Free & High-Fidelity Audio**: Crystal clear high-fidelity audio playback with zero interruptions or ads.
 - 🎤 **Synchronized Lyrics**: Real-time karaoke-style word highlights and line-by-line scrolling lyrics.
-- 🎨 **Sleek Custom UI**: Dark glassmorphic design system in theme orange (`#FF5400`), smooth Framer Motion micro-interactions, and a custom frameless window with native Aero Snap support.
+- 🎨 **Sleek Glassmorphic UI**: Modern dark design system in theme orange (`#FF5400`), smooth micro-interactions, liquid frosted glass headers, and a custom frameless window with native Aero Snap support.
 - 📋 **Library & Offline Playlists**: Manage favorites, custom playlists, and local listening history stored in a local-first SQLite database.
-- 🔄 **Automatic Self-Updates**: Built-in delta updates powered by Velopack that download in seconds without manual reinstalls.
+- 🔄 **Seamless Auto-Updates**: Fast delta updates powered by Velopack that download and apply in seconds.
 - 🎮 **Discord Rich Presence**: Live "Listening to..." activity status on Discord with song titles, artists, and live album art.
 - 🚀 **Fast & Native Windows App**: Lightweight, self-contained desktop experience with instant startup and smooth performance.
 
@@ -37,13 +37,13 @@ Ragam/
 │   ├── Data/                  # Local SQLite DbContext (Favorites, History, Playlists)
 │   ├── Interop/               # BridgeHandler (Bidirectional WebMessage IPC between React & C#)
 │   ├── Models/                # Track, Playlist, Album, and Lyrics Data Models
-│   ├── Services/              # Audio, Lyrics, Update, and Discord RPC Services
+│   ├── Services/              # Audio, Lyrics, Database, Update, and Discord RPC Services
 │   ├── MainWindow.xaml        # Borderless WindowChrome host for WebView2
 │   └── app.ico                # Custom multi-resolution app icon
 │
 ├── Ragam.UI/                   # React 19 + Vite + TypeScript Frontend
 │   ├── src/
-│   │   ├── components/        # PlayerBar, SyncedLyricsView, QueueDrawer, Sidebar, TitleBar, AuthModal
+│   │   ├── components/        # PlayerBar, SyncedLyricsView, NowPlayingView, QueueDrawer, Sidebar, TitleBar, AuthModal, AddToLibraryMenu, UpdateModal
 │   │   ├── context/           # PlayerContext & State Management
 │   │   ├── pages/             # HomePage, SearchPage, LibraryPage, ArtistPage, AlbumPage
 │   │   ├── services/          # NativeBridge RPC client & Firebase Authentication
@@ -80,19 +80,25 @@ dotnet run
 
 ## 📦 Building Releases with Velopack
 
-1. **Build the React Frontend**:
+1. **Install Velopack CLI** (one-time):
+   ```bash
+   dotnet tool install -g vpk
+   ```
+
+2. **Build the React Frontend & Copy Assets**:
    ```bash
    cd Ragam.UI
    npm run build
+   # Copy build output to Ragam.App/wwwroot
    ```
 
-2. **Publish the Self-Contained Binary**:
+3. **Publish the Self-Contained Binary**:
    ```bash
    cd Ragam.App
    dotnet publish -c Release -r win-x64 --self-contained true -o ../bin/publish
    ```
 
-3. **Pack with Velopack**:
+4. **Pack Release with Velopack**:
    ```bash
    vpk pack -u Ragam -v 2.0.5 -p ../bin/publish -e Ragam.exe --packTitle "RAGAM" --packAuthors "Hani" -i app.ico -o ../release
    ```
