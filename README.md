@@ -10,8 +10,8 @@ Get the latest version of RAGAM instantly. Built-in auto-updates will keep your 
 
 | Package | Download Link | Description |
 | :--- | :--- | :--- |
-| **🚀 Windows Setup (Recommended)** | [**Download `Ragam-win-Setup.exe`**](https://github.com/hxni444/Ragam/raw/main/release/Ragam-win-Setup.exe) | One-click installer with automatic background updates & desktop shortcuts. |
-| **📦 Portable Edition (.zip)** | [**Download `Ragam-win-Portable.zip`**](https://github.com/hxni444/Ragam/raw/main/release/Ragam-win-Portable.zip) | No installation required. Unzip and run `Ragam.exe` anywhere. |
+| **🚀 Windows Setup (Recommended)** | [**`Ragam-win-Setup.exe`**](https://github.com/hxni444/Ragam/raw/main/release/Ragam-win-Setup.exe) | One-click installer with automatic background updates & desktop shortcuts. |
+| **📦 Portable Edition (.zip)** | [**`Ragam-win-Portable.zip`**](https://github.com/hxni444/Ragam/raw/main/release/Ragam-win-Portable.zip) | No installation required. Unzip and run `Ragam.exe` anywhere. |
 
 > 💡 *You can also download individual releases and delta packages directly from the [**GitHub Releases Page**](https://github.com/hxni444/Ragam/releases).*
 
