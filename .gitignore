@@ -21,6 +21,9 @@ obj/
 # Session data & local caches
 auth_session.json
 ytm_session.json
+*session*.json
+*cookie*
+*.cookie
 *.log
 
 # Node / UI
