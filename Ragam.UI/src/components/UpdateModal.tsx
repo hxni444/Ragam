@@ -40,7 +40,8 @@ export const UpdateModal: React.FC = () => {
     const initialTimer = setTimeout(() => runCheck(false), 2000);
 
     // Periodic check every 2 minutes
-    const interval = setInterval(() => runCheck(false), 120000);
+    // Periodic background check every 4 hours
+    const interval = setInterval(() => runCheck(false), 4 * 60 * 60 * 1000);
 
     // Listen for manual trigger from Sidebar or Header
     const handleManualCheck = () => runCheck(true);
