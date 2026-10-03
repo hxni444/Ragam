@@ -34,13 +34,15 @@ export const Header: React.FC<HeaderProps> = ({
     bridge.getAuthState().then(setAuthState).catch(console.error);
 
     // 2. Firebase persistence listener across app launches / restarts
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setAuthState(mapFirebaseUserToAuthState(user));
-      }
-    });
-
-    return () => unsubscribe();
+    let unsubscribe: (() => void) | undefined;
+    if (auth) {
+      unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          setAuthState(mapFirebaseUserToAuthState(user));
+        }
+      });
+    }
+    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
   const handleLogout = async () => {

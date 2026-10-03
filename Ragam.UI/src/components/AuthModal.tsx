@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Mail, Lock, User, Loader2 } from 'lucide-react';
 import { bridge } from '../services/bridge';
-import { loginWithFirebase, registerWithFirebase } from '../services/firebase';
+import { loginWithFirebase, registerWithFirebase, isFirebaseConfigured } from '../services/firebase';
 import type { AuthState } from '../types';
 
 interface AuthModalProps {
@@ -39,31 +39,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onAuthSuc
 
     try {
       let state: AuthState;
-      try {
-        if (tab === 'signin') {
-          state = await loginWithFirebase(email, password);
-        } else {
-          state = await registerWithFirebase(email, password, displayName, selectedAvatar);
-        }
-      } catch (fbErr: any) {
-        // Map common Firebase errors
-        const code = fbErr.code || '';
-        if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
-          throw new Error('Invalid email or password.');
-        } else if (code === 'auth/email-already-in-use') {
-          throw new Error('An account with this email already exists.');
-        } else if (code === 'auth/weak-password') {
-          throw new Error('Password should be at least 6 characters.');
-        } else if (code === 'auth/invalid-email') {
-          throw new Error('Please enter a valid email address.');
-        } else {
-          // If Firebase config or offline, fallback to local backend auth
-          console.warn('Firebase error, attempting local auth fallback:', fbErr);
+      if (isFirebaseConfigured) {
+        try {
           if (tab === 'signin') {
-            state = await bridge.loginEmail(email, password);
+            state = await loginWithFirebase(email, password);
           } else {
-            state = await bridge.registerEmail(email, password, displayName, selectedAvatar);
+            state = await registerWithFirebase(email, password, displayName, selectedAvatar);
           }
+        } catch (fbErr: any) {
+          const code = fbErr.code || '';
+          if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+            throw new Error('Invalid email or password.');
+          } else if (code === 'auth/email-already-in-use') {
+            throw new Error('An account with this email already exists.');
+          } else if (code === 'auth/weak-password') {
+            throw new Error('Password should be at least 6 characters.');
+          } else if (code === 'auth/invalid-email') {
+            throw new Error('Please enter a valid email address.');
+          } else {
+            if (tab === 'signin') {
+              state = await bridge.loginEmail(email, password);
+            } else {
+              state = await bridge.registerEmail(email, password, displayName, selectedAvatar);
+            }
+          }
+        }
+      } else {
+        if (tab === 'signin') {
+          state = await bridge.loginEmail(email, password);
+        } else {
+          state = await bridge.registerEmail(email, password, displayName, selectedAvatar);
         }
       }
 

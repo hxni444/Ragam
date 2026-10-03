@@ -4,6 +4,24 @@ bin/
 obj/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
+
+# Secrets & Environment Files
+.env
+.env.*
+*.env
+*.pem
+*.pfx
+*.key
+*.crt
+*.secret
+*.token
+
+# Session data & local caches
+auth_session.json
+ytm_session.json
+*.log
 
 # Node / UI
 node_modules/
@@ -14,12 +32,13 @@ dist/
 *.db
 *.db-shm
 *.db-wal
-*.log
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Release artifacts
+# Release build binaries & intermediate symbols
 release/*.pdb
 release/*.xml
+release/wwwroot/

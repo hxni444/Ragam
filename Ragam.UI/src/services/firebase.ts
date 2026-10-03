@@ -18,20 +18,25 @@ import {
 } from 'firebase/firestore';
 import type { AuthState, Playlist } from '../types';
 
-// Firebase Project config for Layam
+// Firebase Project config - sanitized and loaded via environment variables
 export const firebaseConfig = {
-  apiKey: "AIzaSyChY1h4kml1hglDzIF-3K3iDKmugAUt5AU",
-  authDomain: "layam-7b80f.firebaseapp.com",
-  projectId: "layam-7b80f",
-  storageBucket: "layam-7b80f.firebasestorage.app",
-  messagingSenderId: "976431641719",
-  appId: "1:976431641719:web:7de3873be7273baa214272",
-  measurementId: "G-XB2GB3XWQ5"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const isFirebaseConfigured = !!firebaseConfig.apiKey;
+
+const app = isFirebaseConfigured
+  ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApp())
+  : null;
+
+export const auth = app ? getAuth(app) : null;
+export const db = app ? getFirestore(app) : null;
 
 export const mapFirebaseUserToAuthState = (user: FirebaseUser | null): AuthState => {
   if (!user) {
@@ -46,6 +51,7 @@ export const mapFirebaseUserToAuthState = (user: FirebaseUser | null): AuthState
 };
 
 export const loginWithFirebase = async (email: string, pass: string): Promise<AuthState> => {
+  if (!auth) throw new Error("Firebase not configured");
   const cred = await signInWithEmailAndPassword(auth, email, pass);
   return mapFirebaseUserToAuthState(cred.user);
 };
@@ -56,6 +62,7 @@ export const registerWithFirebase = async (
   displayName: string, 
   avatarUrl?: string
 ): Promise<AuthState> => {
+  if (!auth) throw new Error("Firebase not configured");
   const cred = await createUserWithEmailAndPassword(auth, email, pass);
   await updateProfile(cred.user, {
     displayName: displayName.trim() || email.split('@')[0],
@@ -65,6 +72,7 @@ export const registerWithFirebase = async (
 };
 
 export const loginWithGoogle = async (): Promise<AuthState> => {
+  if (!auth) throw new Error("Firebase not configured");
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   const cred = await signInWithPopup(auth, provider);
@@ -72,11 +80,14 @@ export const loginWithGoogle = async (): Promise<AuthState> => {
 };
 
 export const logoutFromFirebase = async (): Promise<void> => {
-  await signOut(auth);
+  if (auth) {
+    await signOut(auth);
+  }
 };
 
 // Cloud Sync Helpers
 export const syncPlaylistToCloud = async (userId: string, playlist: Playlist): Promise<void> => {
+  if (!db) return;
   try {
     const ref = doc(db, 'users', userId, 'playlists', playlist.id);
     await setDoc(ref, playlist, { merge: true });
@@ -86,6 +97,7 @@ export const syncPlaylistToCloud = async (userId: string, playlist: Playlist): P
 };
 
 export const fetchCloudPlaylists = async (userId: string): Promise<Playlist[]> => {
+  if (!db) return [];
   try {
     const col = collection(db, 'users', userId, 'playlists');
     const snap = await getDocs(col);
