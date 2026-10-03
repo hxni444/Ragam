@@ -1,11 +1,10 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect, useMemo, useCallback } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { UpdateModal } from './components/UpdateModal';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { PlayerBar } from './components/PlayerBar';
 import { SyncedLyricsView } from './components/SyncedLyricsView';
-import { NowPlayingView } from './components/NowPlayingView';
 import { QueueDrawer } from './components/QueueDrawer';
 import { HomePage } from './pages/HomePage';
 import { SearchPage } from './pages/SearchPage';
@@ -17,15 +16,105 @@ import { PlayerProvider } from './context/PlayerContext';
 import type { NavigationTarget } from './types';
 import './styles/index.css';
 
+const STORAGE_KEY_APP_STATE = 'ragam_saved_navigation_state_v1';
+
+interface SavedAppState {
+  history: NavigationTarget[];
+  currentIndex: number;
+  scrollPositions: [number, number][];
+  searchQuery?: string;
+}
+
+const loadSavedState = (): { initialHistory: NavigationTarget[]; initialIndex: number; initialScrolls: Map<number, number>; initialQuery: string } => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_APP_STATE);
+    if (saved) {
+      const parsed: SavedAppState = JSON.parse(saved);
+      if (Array.isArray(parsed.history) && parsed.history.length > 0) {
+        const safeIndex = Math.min(Math.max(0, parsed.currentIndex || 0), parsed.history.length - 1);
+        const map = new Map<number, number>(parsed.scrollPositions || []);
+        return {
+          initialHistory: parsed.history,
+          initialIndex: safeIndex,
+          initialScrolls: map,
+          initialQuery: parsed.searchQuery || ''
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to load saved app navigation state:', e);
+  }
+  return {
+    initialHistory: [{ tab: 'home' }],
+    initialIndex: 0,
+    initialScrolls: new Map(),
+    initialQuery: ''
+  };
+};
+
 export const App: React.FC = () => {
-  const [history, setHistory] = useState<NavigationTarget[]>([{ tab: 'home' }]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
+  const savedState = useMemo(() => loadSavedState(), []);
+  const [history, setHistory] = useState<NavigationTarget[]>(savedState.initialHistory);
+  const [currentIndex, setCurrentIndex] = useState(savedState.initialIndex);
+  const [searchQuery, setSearchQuery] = useState(savedState.initialQuery);
   
-  const scrollPositionsRef = useRef<Map<number, number>>(new Map());
+  const scrollPositionsRef = useRef<Map<number, number>>(savedState.initialScrolls);
   const contentAreaRef = useRef<HTMLElement | null>(null);
 
   const currentTarget = history[currentIndex] || { tab: 'home' };
+
+  // Save current navigation state & scroll positions to localStorage
+  const saveStateToStorage = useCallback(() => {
+    try {
+      if (contentAreaRef.current) {
+        scrollPositionsRef.current.set(currentIndex, contentAreaRef.current.scrollTop);
+      }
+      const dataToSave: SavedAppState = {
+        history,
+        currentIndex,
+        scrollPositions: Array.from(scrollPositionsRef.current.entries()),
+        searchQuery
+      };
+      localStorage.setItem(STORAGE_KEY_APP_STATE, JSON.stringify(dataToSave));
+    } catch (e) {
+      console.warn('Failed to save app navigation state:', e);
+    }
+  }, [history, currentIndex, searchQuery]);
+
+  // Persist state whenever history, index or query updates
+  useEffect(() => {
+    saveStateToStorage();
+  }, [history, currentIndex, searchQuery, saveStateToStorage]);
+
+  // Real-time debounced scroll listener so closing the app at any scroll position restores it accurately
+  useEffect(() => {
+    const el = contentAreaRef.current;
+    if (!el) return;
+
+    let timeoutId: any = null;
+    const handleScroll = () => {
+      scrollPositionsRef.current.set(currentIndex, el.scrollTop);
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        saveStateToStorage();
+      }, 300);
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      el.removeEventListener('scroll', handleScroll);
+    };
+  }, [currentIndex, saveStateToStorage]);
+
+  // Save on window beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      saveStateToStorage();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveStateToStorage]);
 
   const navigateTo = (target: NavigationTarget) => {
     // Save current scroll position of the current page before navigating away
@@ -61,12 +150,11 @@ export const App: React.FC = () => {
   };
 
   // Trackpad 2-finger horizontal swipe gesture & Mouse Back/Forward navigation
-  React.useEffect(() => {
+  useEffect(() => {
     let lastSwipeTime = 0;
     let accumulatedDeltaX = 0;
 
     const handleWheel = (e: WheelEvent) => {
-      // Check for horizontal swipe gesture (dominant horizontal movement)
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.2 && Math.abs(e.deltaX) > 15) {
         accumulatedDeltaX += e.deltaX;
         const now = Date.now();
@@ -88,7 +176,6 @@ export const App: React.FC = () => {
     };
 
     const handleMouseUp = (e: MouseEvent) => {
-      // Mouse button 3 is Back, button 4 is Forward
       if (e.button === 3) {
         e.preventDefault();
         handleGoBack();
@@ -126,14 +213,22 @@ export const App: React.FC = () => {
       contentAreaRef.current.scrollTop = targetScroll;
     }
 
-    // Double-check with a frame tick in case components take a cycle to render
     const frame = requestAnimationFrame(() => {
       if (contentAreaRef.current) {
         contentAreaRef.current.scrollTop = targetScroll;
       }
     });
 
-    return () => cancelAnimationFrame(frame);
+    const timer = setTimeout(() => {
+      if (contentAreaRef.current && contentAreaRef.current.scrollTop !== targetScroll) {
+        contentAreaRef.current.scrollTop = targetScroll;
+      }
+    }, 150);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
   }, [currentIndex, currentTarget]);
 
   return (
@@ -151,8 +246,6 @@ export const App: React.FC = () => {
               searchQuery={searchQuery}
               canGoBack={currentIndex > 0}
               onGoBack={handleGoBack}
-              canGoForward={currentIndex < history.length - 1}
-              onGoForward={handleGoForward}
             />
 
             <main ref={contentAreaRef} className="content-area">
@@ -186,7 +279,6 @@ export const App: React.FC = () => {
         </div>
 
         <PlayerBar />
-        <NowPlayingView />
         <UpdateModal />
       </div>
     </PlayerProvider>
