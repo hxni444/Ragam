@@ -3,6 +3,7 @@ import { Play, ListMusic, Disc, Radio, Loader2 } from 'lucide-react';
 import type { Album } from '../types';
 import { usePlayer } from '../context/PlayerContext';
 import { bridge } from '../services/bridge';
+import { AddToLibraryMenu } from './AddToLibraryMenu';
 
 interface AlbumCardProps {
   album: Album;
@@ -52,18 +53,23 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album, onSelectAlbum }) =>
           {isMix ? <Radio size={10} /> : isPlaylist ? <ListMusic size={10} /> : <Disc size={10} />}
           <span>{cardType}</span>
         </div>
-        <button
-          className="card-floating-play"
-          onClick={handlePlayClick}
-          title={`Play ${album.title}`}
-          disabled={loading}
-        >
-          {loading ? (
-            <Loader2 size={20} className="animate-spin" color="#000" />
-          ) : (
-            <Play size={22} fill="#000" color="#000" style={{ transform: 'translateX(1px)' }} />
-          )}
-        </button>
+        
+        {/* Floating Actions on Hover */}
+        <div className="card-floating-actions" onClick={(e) => e.stopPropagation()}>
+          <AddToLibraryMenu album={album} iconSize={16} className="card-floating-add" />
+          <button
+            className="card-floating-play"
+            onClick={handlePlayClick}
+            title={`Play ${album.title}`}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 size={20} className="animate-spin" color="#000" />
+            ) : (
+              <Play size={22} fill="#000" color="#000" style={{ transform: 'translateX(1px)' }} />
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="card-info">

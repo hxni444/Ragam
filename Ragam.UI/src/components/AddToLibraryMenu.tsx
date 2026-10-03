@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Heart, ListMusic, Check } from 'lucide-react';
-import type { Track, Playlist } from '../types';
+import { Plus, Heart, ListMusic, Check, Loader2 } from 'lucide-react';
+import type { Track, Playlist, Album, Artist } from '../types';
 import { bridge } from '../services/bridge';
 
 interface AddToLibraryMenuProps {
   track?: Track;
   tracks?: Track[];
+  album?: Album;
+  artist?: Artist;
   iconSize?: number;
   className?: string;
   buttonStyle?: React.CSSProperties;
@@ -16,6 +18,8 @@ interface AddToLibraryMenuProps {
 export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
   track,
   tracks,
+  album,
+  artist,
   iconSize = 16,
   className = "control-btn",
   buttonStyle,
@@ -23,12 +27,20 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
   align = 'right'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [loadingTracks, setLoadingTracks] = useState(false);
+  const [resolvedTracks, setResolvedTracks] = useState<Track[]>(tracks || (track ? [track] : []));
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [addedMessage, setAddedMessage] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const targetTracks: Track[] = tracks || (track ? [track] : []);
+  useEffect(() => {
+    if (tracks) {
+      setResolvedTracks(tracks);
+    } else if (track) {
+      setResolvedTracks([track]);
+    }
+  }, [track, tracks]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,18 +58,56 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
     e.stopPropagation();
     if (!isOpen) {
       try {
+        let currentTargetTracks = resolvedTracks;
+
+        // If album is passed and tracks not yet loaded, fetch them
+        if (album && (!currentTargetTracks || currentTargetTracks.length === 0)) {
+          if (album.tracks && album.tracks.length > 0) {
+            currentTargetTracks = album.tracks;
+            setResolvedTracks(album.tracks);
+          } else {
+            setLoadingTracks(true);
+            const res = await bridge.getAlbumOrPlaylist(album.title, album.artist, album.thumbnailUrl, album.id);
+            if (res && res.tracks && res.tracks.length > 0) {
+              album.tracks = res.tracks;
+              currentTargetTracks = res.tracks;
+              setResolvedTracks(res.tracks);
+            }
+            setLoadingTracks(false);
+          }
+        }
+
+        // If artist is passed and top tracks not yet loaded, fetch them
+        if (artist && (!currentTargetTracks || currentTargetTracks.length === 0)) {
+          if (artist.topTracks && artist.topTracks.length > 0) {
+            currentTargetTracks = artist.topTracks;
+            setResolvedTracks(artist.topTracks);
+          } else {
+            setLoadingTracks(true);
+            const res = await bridge.getArtistDetails(artist.name, artist.thumbnailUrl, artist.id);
+            if (res && res.topTracks && res.topTracks.length > 0) {
+              artist.topTracks = res.topTracks;
+              currentTargetTracks = res.topTracks;
+              setResolvedTracks(res.topTracks);
+            }
+            setLoadingTracks(false);
+          }
+        }
+
         const [pls, favs] = await Promise.all([
           bridge.getPlaylists(),
           bridge.getFavorites()
         ]);
         setPlaylists(pls);
+
         if (track) {
           setIsFavorite(favs.some((f) => f.id === track.id));
-        } else if (targetTracks.length > 0) {
-          setIsFavorite(targetTracks.every((t) => favs.some((f) => f.id === t.id)));
+        } else if (currentTargetTracks.length > 0) {
+          setIsFavorite(currentTargetTracks.every((t) => favs.some((f) => f.id === t.id)));
         }
       } catch (err) {
         console.error('Failed to load library data:', err);
+        setLoadingTracks(false);
       }
     }
     setIsOpen(!isOpen);
@@ -70,12 +120,12 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
         const res = await bridge.toggleFavorite(track);
         setIsFavorite(res.isFavorite);
         showFeedback(res.isFavorite ? 'Added to Liked Songs' : 'Removed from Liked Songs');
-      } else if (targetTracks.length > 0) {
-        for (const t of targetTracks) {
+      } else if (resolvedTracks.length > 0) {
+        for (const t of resolvedTracks) {
           await bridge.toggleFavorite(t);
         }
         setIsFavorite(!isFavorite);
-        showFeedback(`Updated ${targetTracks.length} songs in Liked Songs`);
+        showFeedback(`Updated ${resolvedTracks.length} songs in Liked Songs`);
       }
     } catch (err) {
       console.error('Failed to toggle favorite:', err);
@@ -85,8 +135,8 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
   const handleTogglePlaylist = async (e: React.MouseEvent, pl: Playlist) => {
     e.stopPropagation();
     try {
-      if (targetTracks.length === 1) {
-        const singleTrack = targetTracks[0];
+      if (resolvedTracks.length === 1) {
+        const singleTrack = resolvedTracks[0];
         const isInPlaylist = pl.tracks?.some((t) => t.id === singleTrack.id) || false;
         if (isInPlaylist) {
           await bridge.removeFromPlaylist(pl.id, singleTrack.id);
@@ -109,11 +159,10 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
           );
           showFeedback(`Added to ${pl.name}`);
         }
-      } else if (targetTracks.length > 1) {
-        // Batch add all tracks
+      } else if (resolvedTracks.length > 1) {
         let addedCount = 0;
         const currentTrackIds = new Set((pl.tracks || []).map((t) => t.id));
-        for (const t of targetTracks) {
+        for (const t of resolvedTracks) {
           if (!currentTrackIds.has(t.id)) {
             await bridge.addTrackToPlaylist(pl.id, t);
             addedCount++;
@@ -134,18 +183,16 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
     }, 1500);
   };
 
-  if (targetTracks.length === 0) return null;
-
   return (
     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }} ref={menuRef}>
       <button
         type="button"
         className={className}
         onClick={handleOpenMenu}
-        title={targetTracks.length > 1 ? "Add all to Playlist" : "Add to library or playlist"}
+        title={resolvedTracks.length > 1 || album || artist ? "Add all to custom playlist" : "Add to library or playlist"}
         style={buttonStyle}
       >
-        <Plus size={iconSize} />
+        {loadingTracks ? <Loader2 size={iconSize} className="animate-spin" /> : <Plus size={iconSize} />}
         {label && <span style={{ marginLeft: '6px' }}>{label}</span>}
       </button>
 
@@ -203,7 +250,7 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Heart size={16} fill={isFavorite ? 'var(--primary)' : 'none'} color={isFavorite ? 'var(--primary)' : '#fff'} />
-                  <span>{targetTracks.length > 1 ? 'Save All to Liked Songs' : (isFavorite ? 'In Liked Songs' : 'Add to Liked Songs')}</span>
+                  <span>{resolvedTracks.length > 1 ? 'Save All to Liked Songs' : (isFavorite ? 'In Liked Songs' : 'Add to Liked Songs')}</span>
                 </div>
                 {isFavorite && <Check size={14} color="var(--primary)" />}
               </div>
@@ -212,7 +259,7 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
 
               {/* Playlists Header */}
               <div style={{ fontSize: '11px', fontWeight: 700, padding: '4px 12px', color: 'var(--text-subdued)', letterSpacing: '0.05em' }}>
-                {targetTracks.length > 1 ? `ADD ${targetTracks.length} SONGS TO PLAYLIST` : 'ADD TO PLAYLIST'}
+                {resolvedTracks.length > 1 ? `ADD ${resolvedTracks.length} SONGS TO PLAYLIST` : 'ADD TO PLAYLIST'}
               </div>
 
               {playlists.length === 0 ? (
@@ -221,9 +268,9 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
                 </div>
               ) : (
                 playlists.map((pl) => {
-                  const isInPlaylist = targetTracks.length === 1 
-                    ? (pl.tracks?.some((t) => t.id === targetTracks[0].id) || false)
-                    : (targetTracks.every((t) => (pl.tracks || []).some((pt) => pt.id === t.id)));
+                  const isInPlaylist = resolvedTracks.length === 1 
+                    ? (pl.tracks?.some((t) => t.id === resolvedTracks[0].id) || false)
+                    : (resolvedTracks.length > 0 && resolvedTracks.every((t) => (pl.tracks || []).some((pt) => pt.id === t.id)));
                   return (
                     <div
                       key={pl.id}

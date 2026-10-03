@@ -3,6 +3,7 @@ import { Play, Loader2 } from 'lucide-react';
 import type { Artist } from '../types';
 import { usePlayer } from '../context/PlayerContext';
 import { bridge } from '../services/bridge';
+import { AddToLibraryMenu } from './AddToLibraryMenu';
 
 interface ArtistCardProps {
   artist: Artist;
@@ -42,18 +43,21 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({ artist, onSelectArtist }
         <div className="card-img-wrap artist">
           <img src={artist.thumbnailUrl} alt={artist.name} className="card-img" />
         </div>
-        <button
-          className="card-floating-play"
-          onClick={handlePlayClick}
-          title={`Play ${artist.name}`}
-          disabled={loading}
-        >
-          {loading ? (
-            <Loader2 size={20} className="animate-spin" color="#000" />
-          ) : (
-            <Play size={22} fill="#000" color="#000" style={{ transform: 'translateX(1px)' }} />
-          )}
-        </button>
+        <div className="card-floating-actions" onClick={(e) => e.stopPropagation()}>
+          <AddToLibraryMenu artist={artist} iconSize={16} className="card-floating-add" />
+          <button
+            className="card-floating-play"
+            onClick={handlePlayClick}
+            title={`Play ${artist.name}`}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 size={20} className="animate-spin" color="#000" />
+            ) : (
+              <Play size={22} fill="#000" color="#000" style={{ transform: 'translateX(1px)' }} />
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="card-info">
