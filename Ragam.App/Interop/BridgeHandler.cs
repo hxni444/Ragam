@@ -384,6 +384,7 @@ public class BridgeHandler
         {
             System.Diagnostics.Debug.WriteLine($"Bridge error: {ex}");
 
+
         }
     }
 }

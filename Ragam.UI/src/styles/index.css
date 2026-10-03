@@ -709,23 +709,34 @@ body {
 }
 
 .control-btn {
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
   color: var(--text-subdued);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
-  padding: 4px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .control-btn:hover {
-  color: var(--text-bright);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 6px 16px rgba(0, 0, 0, 0.45);
 }
 
 .control-btn.active {
   color: var(--primary);
+  background: rgba(255, 84, 0, 0.16);
+  border-color: rgba(255, 84, 0, 0.4);
+  box-shadow: 0 0 14px var(--primary-glow);
 }
 
 .play-btn-circle {

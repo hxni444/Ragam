@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Library, Plus, Heart, History, ListMusic } from 'lucide-react';
+import { Library, Plus, Heart, History, ListMusic } from 'lucide-react';
 import type { NavigationTarget, Playlist } from '../types';
 import { bridge } from '../services/bridge';
 
@@ -68,16 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
   return (
     <aside className="sidebar">
       
-      {/* Top Nav */}
-      <div className="sidebar-nav">
-        <div
-          className={`sidebar-item ${isCurrent('home') ? 'active' : ''}`}
-          onClick={() => onNavigate({ tab: 'home' })}
-        >
-          <Home size={22} />
-          <span>Home</span>
-        </div>
-      </div>
+      
 
       {/* Library Section */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
