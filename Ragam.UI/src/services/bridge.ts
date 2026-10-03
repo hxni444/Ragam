@@ -24,6 +24,7 @@ declare global {
 
 
 class NativeBridge {
+  public readonly appVersion: string = "2.0.0";
   private pendingRequests = new Map<string, { resolve: (data: any) => void; reject: (err: any) => void }>();
   private eventListeners = new Map<string, Set<(payload: any) => void>>();
   private isNativeAvailable = false;

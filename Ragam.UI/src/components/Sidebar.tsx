@@ -211,7 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
             e.currentTarget.style.background = updateStatus ? 'rgba(255, 84, 0, 0.15)' : 'rgba(255, 255, 255, 0.06)';
           }}
         >
-          {updateStatus || 'v1.0.3'}
+          {updateStatus || `v${bridge.appVersion}`}
         </span>
       </div>
     </aside>
