@@ -50,6 +50,12 @@ export const UpdateModal: React.FC = () => {
     const unsubscribe = bridge.on('update_progress', (payload: { progress: number }) => {
       if (typeof payload?.progress === 'number') {
         setProgress(payload.progress);
+        if (payload.progress >= 95) {
+          setError(null); // Clear any transient timeout messages during restart
+        }
+      }
+      if (typeof payload?.progress === 'number') {
+        setProgress(payload.progress);
       }
     });
 
