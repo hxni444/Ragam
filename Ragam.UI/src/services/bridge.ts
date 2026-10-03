@@ -25,7 +25,7 @@ declare global {
 
 
 class NativeBridge {
-  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.7';
+  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.8';
   private pendingRequests = new Map<string, { resolve: (data: any) => void; reject: (err: any) => void }>();
   private eventListeners = new Map<string, Set<(payload: any) => void>>();
   private isNativeAvailable = false;
@@ -81,9 +81,8 @@ class NativeBridge {
         payload
       }));
 
-      // Timeout after 15 seconds
-            // Extended timeout for interactive actions (YouTube auth, update installation)
-      const timeoutMs = (action === 'login_youtube' || action === 'install_update') ? 600000 : 30000;
+      // Extended timeout for long-running / network actions (YouTube auth, update check & installation)
+      const timeoutMs = (action === 'login_youtube' || action === 'install_update' || action === 'check_for_updates') ? 600000 : 30000;
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);

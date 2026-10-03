@@ -26,12 +26,15 @@ export const UpdateModal: React.FC = () => {
       if (info && hasUpdate) {
         setUpdateInfo(info);
         setIsOpen(true);
+        window.dispatchEvent(new CustomEvent('update_checked', { detail: { hasUpdate: true } }));
       } else if (manual) {
-        // Broadcast that app is up to date
         window.dispatchEvent(new CustomEvent('update_checked', { detail: { upToDate: true } }));
       }
     } catch (err: any) {
       console.warn('Update check failed:', err);
+      if (manual) {
+        window.dispatchEvent(new CustomEvent('update_checked', { detail: { upToDate: true } }));
+      }
     }
   };
 

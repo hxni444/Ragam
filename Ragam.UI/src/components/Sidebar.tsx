@@ -35,10 +35,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
 
     useEffect(() => {
     const handleChecked = (e: any) => {
-      
       if (e.detail?.upToDate) {
         setUpdateStatus('Up to date!');
         setTimeout(() => setUpdateStatus(null), 3000);
+      } else if (e.detail?.hasUpdate) {
+        setUpdateStatus(null);
       }
     };
     window.addEventListener('update_checked', handleChecked);
@@ -46,13 +47,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTarget, onNavigate }) =
   }, []);
 
   const triggerUpdateCheck = () => {
-    
+    if (updateStatus === 'Checking...') return;
     setUpdateStatus('Checking...');
     window.dispatchEvent(new CustomEvent('check_for_updates_manual'));
-    setTimeout(() => {
-      
-      setUpdateStatus((prev) => prev === 'Checking...' ? null : prev);
-    }, 4000);
   };
 
   const handleCreatePlaylist = async (e: React.FormEvent) => {

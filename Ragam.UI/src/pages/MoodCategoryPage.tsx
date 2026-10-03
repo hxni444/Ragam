@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Disc3 } from 'lucide-react';
+import { Disc3 } from 'lucide-react';
 import type { MoodAndGenreItem, HomeFeed, HomeSectionItem, NavigationTarget, Track, Album, Artist } from '../types';
 import { bridge } from '../services/bridge';
 import { TrackCard } from '../components/TrackCard';
@@ -108,31 +108,6 @@ export const MoodCategoryPage: React.FC<MoodCategoryPageProps> = ({ mood, onNavi
           boxShadow: `0 8px 32px ${stripeColor}18`
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-          <button
-            onClick={() => onNavigate({ tab: 'home' })}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              color: '#fff',
-              padding: '6px 14px',
-              borderRadius: '500px',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease'
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-          >
-            <ArrowLeft size={16} />
-            <span>Back to Home</span>
-          </button>
-        </div>
-
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div
             style={{
