@@ -1,3 +1,8 @@
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus, Heart, ListMusic, Check, Loader2 } from 'lucide-react';
+import type { Track, Playlist, Album, Artist } from '../types';
+import { bridge } from '../services/bridge';
 
 export const isSameTrack = (t1?: Track, t2?: Track): boolean => {
   if (!t1 || !t2) return false;
@@ -26,11 +31,6 @@ export const isSameTrack = (t1?: Track, t2?: Track): boolean => {
   return false;
 };
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Heart, ListMusic, Check, Loader2 } from 'lucide-react';
-import type { Track, Playlist, Album, Artist } from '../types';
-import { bridge } from '../services/bridge';
-
 interface AddToLibraryMenuProps {
   track?: Track;
   tracks?: Track[];
@@ -40,7 +40,7 @@ interface AddToLibraryMenuProps {
   className?: string;
   buttonStyle?: React.CSSProperties;
   label?: string;
-  align?: 'left' | 'right';
+  align?: 'left' | 'right' | 'center';
 }
 
 export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
@@ -52,14 +52,18 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
   className = "control-btn",
   buttonStyle,
   label,
-  align = 'right'
+  align = 'center'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [loadingTracks, setLoadingTracks] = useState(false);
   const [resolvedTracks, setResolvedTracks] = useState<Track[]>(tracks || (track ? [track] : []));
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [addedMessage, setAddedMessage] = useState<string | null>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,73 +76,132 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        menuRef.current && !menuRef.current.contains(target) &&
+        buttonRef.current && !buttonRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
+
+    const handleScrollOrResize = () => {
+      if (isOpen) {
+        setIsOpen(false);
+      }
+    };
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
   }, [isOpen]);
 
-  const handleOpenMenu = async (e: React.MouseEvent) => {
+  const updatePosition = () => {
+    if (buttonRef.current) {
+      const btnRect = buttonRef.current.getBoundingClientRect();
+      const menuEl = menuRef.current;
+      const menuWidth = menuEl ? menuEl.offsetWidth : 240;
+      const menuHeight = menuEl ? menuEl.offsetHeight : 150;
+
+      let left: number;
+      if (align === 'center') {
+        left = btnRect.left + (btnRect.width / 2) - (menuWidth / 2);
+      } else if (align === 'left') {
+        left = btnRect.left;
+      } else {
+        left = btnRect.right - menuWidth;
+      }
+
+      // Clamp horizontally
+      if (left < 16) {
+        left = 16;
+      }
+      if (left + menuWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - menuWidth - 16);
+      }
+
+      // Vertical positioning
+      const playerBarMargin = 96;
+      let top = btnRect.bottom + 6;
+
+      if (top + menuHeight > window.innerHeight - playerBarMargin) {
+        top = Math.max(16, btnRect.top - menuHeight - 6);
+      }
+
+      setCoords({ top, left });
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (isOpen) {
+      updatePosition();
+    }
+  }, [isOpen, playlists, addedMessage]);
+
+  const handleOpenMenu = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!isOpen) {
+    
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+
+    // 1. OPEN IMMEDIATELY without waiting for async requests
+    setIsOpen(true);
+    setLoadingData(true);
+
+    // 2. Fetch data concurrently in the background
+    (async () => {
       try {
         let currentTargetTracks = resolvedTracks;
 
-        // If album is passed and tracks not yet loaded, fetch them
-        if (album && (!currentTargetTracks || currentTargetTracks.length === 0)) {
-          if (album.tracks && album.tracks.length > 0) {
-            currentTargetTracks = album.tracks;
-            setResolvedTracks(album.tracks);
-          } else {
-            setLoadingTracks(true);
-            const res = await bridge.getAlbumOrPlaylist(album.title, album.artist, album.thumbnailUrl, album.id);
-            if (res && res.tracks && res.tracks.length > 0) {
-              album.tracks = res.tracks;
-              currentTargetTracks = res.tracks;
-              setResolvedTracks(res.tracks);
+        // Fetch album tracks if missing
+        const albumPromise = (async () => {
+          if (album && (!currentTargetTracks || currentTargetTracks.length === 0)) {
+            if (album.tracks && album.tracks.length > 0) {
+              currentTargetTracks = album.tracks;
+              setResolvedTracks(album.tracks);
+            } else if (album.id) {
+              setLoadingTracks(true);
+              const detail = await bridge.getAlbumOrPlaylist(album.title, album.artist, album.thumbnailUrl, album.id);
+              if (detail && detail.tracks) {
+                currentTargetTracks = detail.tracks;
+                setResolvedTracks(detail.tracks);
+              }
+              setLoadingTracks(false);
             }
-            setLoadingTracks(false);
           }
-        }
+        })();
 
-        // If artist is passed and top tracks not yet loaded, fetch them
-        if (artist && (!currentTargetTracks || currentTargetTracks.length === 0)) {
-          if (artist.topTracks && artist.topTracks.length > 0) {
-            currentTargetTracks = artist.topTracks;
-            setResolvedTracks(artist.topTracks);
-          } else {
-            setLoadingTracks(true);
-            const res = await bridge.getArtistDetails(artist.name, artist.thumbnailUrl, artist.id);
-            if (res && res.topTracks && res.topTracks.length > 0) {
-              artist.topTracks = res.topTracks;
-              currentTargetTracks = res.topTracks;
-              setResolvedTracks(res.topTracks);
-            }
-            setLoadingTracks(false);
-          }
-        }
-
+        // Fetch playlists and favorites in parallel
         const [pls, favs] = await Promise.all([
           bridge.getPlaylists(),
-          bridge.getFavorites()
+          bridge.getFavorites(),
+          albumPromise
         ]);
-        setPlaylists(pls);
+
+        setPlaylists(pls || []);
 
         if (track) {
-          setIsFavorite(favs.some((f) => isSameTrack(f, track)));
-        } else if (currentTargetTracks.length > 0) {
-          setIsFavorite(currentTargetTracks.every((t) => favs.some((f) => isSameTrack(f, t))));
+          setIsFavorite((favs || []).some((f: Track) => isSameTrack(f, track)));
+        } else if (currentTargetTracks && currentTargetTracks.length > 0) {
+          const allFav = currentTargetTracks.every((t) => (favs || []).some((f: Track) => isSameTrack(f, t)));
+          setIsFavorite(allFav);
         }
       } catch (err) {
-        console.error('Failed to load library data:', err);
+        console.error('Failed to load menu data:', err);
+      } finally {
+        setLoadingData(false);
         setLoadingTracks(false);
       }
-    }
-    setIsOpen(!isOpen);
+    })();
   };
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
@@ -171,7 +234,7 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
           setPlaylists((prev) =>
             prev.map((p) =>
               p.id === pl.id
-                ? { ...p, tracks: (p.tracks || []).filter((t) => t.id !== singleTrack.id) }
+                ? { ...p, tracks: (p.tracks || []).filter((t) => !isSameTrack(t, singleTrack)) }
                 : p
             )
           );
@@ -212,8 +275,9 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
   };
 
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }} ref={menuRef}>
+    <>
       <button
+        ref={buttonRef}
         type="button"
         className={className}
         onClick={handleOpenMenu}
@@ -224,22 +288,25 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
         {label && <span style={{ marginLeft: '6px' }}>{label}</span>}
       </button>
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            ...(align === 'right' ? { right: 0 } : { left: 0 }),
-            top: 'calc(100% + 8px)',
+            position: 'fixed',
+            top: coords.top,
+            left: coords.left,
             background: '#242424',
             border: '1px solid var(--border-subtle)',
             borderRadius: '10px',
             padding: '6px',
-            boxShadow: '0 16px 40px rgba(0,0,0,0.85)',
-            zIndex: 9999,
-            minWidth: '230px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.6)',
+            zIndex: 9999999,
+            minWidth: '240px',
+            maxWidth: '280px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2px'
+            gap: '2px',
+            animation: 'fadeIn 0.12s ease'
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -278,7 +345,7 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Heart size={16} fill={isFavorite ? 'var(--primary)' : 'none'} color={isFavorite ? 'var(--primary)' : '#fff'} />
-                  <span>{resolvedTracks.length > 1 ? 'Save All to Liked Songs' : (isFavorite ? 'In Liked Songs' : 'Add to Liked Songs')}</span>
+                  <span>{resolvedTracks.length > 1 ? `Save All (${resolvedTracks.length}) to Liked Songs` : (isFavorite ? 'In Liked Songs' : 'Add to Liked Songs')}</span>
                 </div>
                 {isFavorite && <Check size={14} color="var(--primary)" />}
               </div>
@@ -290,49 +357,57 @@ export const AddToLibraryMenu: React.FC<AddToLibraryMenuProps> = ({
                 {resolvedTracks.length > 1 ? `ADD ${resolvedTracks.length} SONGS TO PLAYLIST` : 'ADD TO PLAYLIST'}
               </div>
 
-              {playlists.length === 0 ? (
+              {loadingData && playlists.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', fontSize: '12px', color: 'var(--text-subdued)' }}>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Loading playlists...</span>
+                </div>
+              ) : playlists.length === 0 ? (
                 <div style={{ fontSize: '12px', color: 'var(--text-subdued)', padding: '6px 12px' }}>
                   No custom playlists yet
                 </div>
               ) : (
-                playlists.map((pl) => {
-                  const isInPlaylist = resolvedTracks.length === 1 
-                    ? (pl.tracks?.some((t) => t.id === resolvedTracks[0].id) || false)
-                    : (resolvedTracks.length > 0 && resolvedTracks.every((t) => (pl.tracks || []).some((pt) => pt.id === t.id)));
-                  return (
-                    <div
-                      key={pl.id}
-                      onClick={(e) => handleTogglePlaylist(e, pl)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        color: isInPlaylist ? 'var(--primary)' : '#fff',
-                        fontSize: '13px',
-                        fontWeight: isInPlaylist ? 600 : 400,
-                        cursor: 'pointer',
-                        transition: 'background 0.15s ease'
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                        <ListMusic size={15} color={isInPlaylist ? 'var(--primary)' : 'var(--text-subdued)'} />
-                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {pl.name}
-                        </span>
+                <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {playlists.map((pl) => {
+                    const isInPlaylist = resolvedTracks.length === 1 
+                      ? (pl.tracks?.some((t) => isSameTrack(t, resolvedTracks[0])) || false)
+                      : (resolvedTracks.length > 0 && resolvedTracks.every((t) => (pl.tracks || []).some((pt) => isSameTrack(pt, t))));
+                    return (
+                      <div
+                        key={pl.id}
+                        onClick={(e) => handleTogglePlaylist(e, pl)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          color: isInPlaylist ? 'var(--primary)' : '#fff',
+                          fontSize: '13px',
+                          fontWeight: isInPlaylist ? 600 : 400,
+                          cursor: 'pointer',
+                          transition: 'background 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                          <ListMusic size={15} color={isInPlaylist ? 'var(--primary)' : 'var(--text-subdued)'} />
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {pl.name}
+                          </span>
+                        </div>
+                        {isInPlaylist && <Check size={14} color="var(--primary)" />}
                       </div>
-                      {isInPlaylist && <Check size={14} color="var(--primary)" />}
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </div>
               )}
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 };
