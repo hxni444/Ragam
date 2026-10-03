@@ -9,8 +9,8 @@ namespace Ragam.App.Services;
 public class UpdateInfo
 {
     public bool HasUpdate { get; set; }
-    public string CurrentVersion { get; set; } = "2.0.0";
-    public string LatestVersion { get; set; } = "2.0.0";
+    public string CurrentVersion { get; set; } = "2.0.1";
+    public string LatestVersion { get; set; } = "2.0.1";
     public string ReleaseNotes { get; set; } = "";
     public string DownloadUrl { get; set; } = "";
     public string PublishedAt { get; set; } = "";
@@ -18,7 +18,8 @@ public class UpdateInfo
 
 public class UpdateService
 {
-    private const string RepoUrl = "https://github.com/hxni444/Ragam";
+    // Using SimpleWebSource pointing to GitHub Releases latest download avoids GitHub API 60 req/hr rate limits completely.
+    private const string DownloadSourceUrl = "https://github.com/hxni444/Ragam/releases/latest/download";
     private UpdateManager? _mgr;
     private Velopack.UpdateInfo? _velopackUpdate;
 
@@ -26,7 +27,7 @@ public class UpdateService
     {
         if (_mgr == null)
         {
-            var source = new GithubSource(RepoUrl, accessToken: null, prerelease: false);
+            var source = new SimpleWebSource(DownloadSourceUrl);
             _mgr = new UpdateManager(source);
         }
         return _mgr;
@@ -45,7 +46,7 @@ public class UpdateService
         catch { }
 
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "2.0.0";
+        return version != null ? $"{version.Major}.{version.Minor}.{version.Build}" : "2.0.1";
     }
 
     public async Task<UpdateInfo> CheckForUpdatesAsync()
@@ -61,18 +62,24 @@ public class UpdateService
         try
         {
             var mgr = GetManager();
+            if (!mgr.IsInstalled)
+            {
+                Debug.WriteLine("[UpdateService] Application is not running from installed directory (dev mode).");
+                return info;
+            }
+
             _velopackUpdate = await mgr.CheckForUpdatesAsync();
 
             if (_velopackUpdate != null)
             {
                 info.HasUpdate = true;
                 info.LatestVersion = _velopackUpdate.TargetFullRelease.Version.ToFullString();
-                info.ReleaseNotes = "RAGAM v" + info.LatestVersion + " is ready to install via Velopack.";
+                info.ReleaseNotes = "RAGAM v" + info.LatestVersion + " is ready to install.";
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Velopack update check exception: {ex.Message}");
+            Debug.WriteLine($"[UpdateService] Update check exception: {ex.Message}");
         }
 
         return info;
@@ -83,6 +90,12 @@ public class UpdateService
         try
         {
             var mgr = GetManager();
+            if (!mgr.IsInstalled)
+            {
+                Debug.WriteLine("[UpdateService] Cannot update in dev mode.");
+                return false;
+            }
+
             if (_velopackUpdate == null)
             {
                 _velopackUpdate = await mgr.CheckForUpdatesAsync();
@@ -102,7 +115,7 @@ public class UpdateService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Velopack apply updates error: {ex.Message}");
+            Debug.WriteLine($"[UpdateService] Velopack apply updates error: {ex.Message}");
             return false;
         }
     }
