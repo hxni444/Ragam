@@ -1,3 +1,4 @@
+import { AddToLibraryMenu } from '../components/AddToLibraryMenu';
 import React, { useState, useEffect } from 'react';
 import { Play, Clock } from 'lucide-react';
 import type { Album, Track } from '../types';
@@ -86,19 +87,33 @@ export const AlbumDetailPage: React.FC<AlbumDetailPageProps> = ({ album }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: loading || tracks.length === 0 ? 'default' : 'pointer',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
-            transition: 'transform 0.15s ease',
-            opacity: loading || tracks.length === 0 ? 0.6 : 1
+            cursor: loading || tracks.length === 0 ? 'not-allowed' : 'pointer',
+            boxShadow: '0 8px 24px var(--primary-glow)',
+            transition: 'transform 0.15s ease'
           }}
-          onMouseEnter={(e) => {
-            if (!loading && tracks.length > 0) e.currentTarget.style.transform = 'scale(1.06)';
-          }}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          onMouseEnter={(e) => { if (!loading && tracks.length > 0) e.currentTarget.style.transform = 'scale(1.05)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
           title="Play album"
         >
-          <Play size={24} fill="#000" color="#000" style={{ transform: 'translateX(1px)' }} />
+          <Play size={24} fill="#000" color="#000" style={{ transform: 'translateX(2px)' }} />
         </button>
+
+        <AddToLibraryMenu 
+          tracks={tracks} 
+          iconSize={18} 
+          label="Add to Playlist"
+          align="left"
+          className="control-btn"
+          buttonStyle={{
+            padding: '10px 18px',
+            borderRadius: '500px',
+            fontSize: '13px',
+            fontWeight: 700,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        />
       </div>
 
       {/* Tracklist Table */}

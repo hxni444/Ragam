@@ -1,3 +1,4 @@
+import { AddToLibraryMenu } from '../components/AddToLibraryMenu';
 import React, { useState, useEffect } from 'react';
 import { Play, ListMusic, Trash2, Clock } from 'lucide-react';
 import type { Playlist, NavigationTarget } from '../types';
@@ -120,28 +121,46 @@ export const PlaylistDetailPage: React.FC<PlaylistDetailPageProps> = ({ playlist
 
       {/* Action Bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '8px 0' }}>
+        <button
+          onClick={handlePlayPlaylist}
+          disabled={!playlist.tracks || playlist.tracks.length === 0}
+          style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            background: !playlist.tracks || playlist.tracks.length === 0 ? '#333' : 'var(--primary)',
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: !playlist.tracks || playlist.tracks.length === 0 ? 'not-allowed' : 'pointer',
+            boxShadow: '0 8px 24px var(--primary-glow)',
+            transition: 'transform 0.15s ease'
+          }}
+          onMouseEnter={(e) => { if (playlist.tracks && playlist.tracks.length > 0) e.currentTarget.style.transform = 'scale(1.05)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+          title="Play playlist"
+        >
+          <Play size={24} fill="#000" color="#000" style={{ transform: 'translateX(2px)' }} />
+        </button>
+
         {playlist.tracks && playlist.tracks.length > 0 && (
-          <button
-            onClick={handlePlayPlaylist}
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: 'var(--primary)',
-              border: 'none',
-              display: 'flex',
+          <AddToLibraryMenu 
+            tracks={playlist.tracks} 
+            iconSize={18} 
+            label="Add to Playlist"
+            align="left"
+            className="control-btn"
+            buttonStyle={{
+              padding: '10px 18px',
+              borderRadius: '500px',
+              fontSize: '13px',
+              fontWeight: 700,
+              display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              boxShadow: '0 8px 20px rgba(0,0,0,0.5)',
-              transition: 'transform 0.15s ease'
+              gap: '6px'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.06)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            title="Play playlist"
-          >
-            <Play size={24} fill="#000" color="#000" style={{ transform: 'translateX(1px)' }} />
-          </button>
+          />
         )}
 
         <button
