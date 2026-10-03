@@ -45,13 +45,17 @@ class NativeBridge {
             }
             return;
           }
-          if (res && res.id && this.pendingRequests.has(res.id)) {
-            const { resolve, reject } = this.pendingRequests.get(res.id)!;
-            this.pendingRequests.delete(res.id);
-            if (res.success) {
-              resolve(res.data);
+          const msgId = res?.id || res?.Id;
+          if (msgId && this.pendingRequests.has(msgId)) {
+            const { resolve, reject } = this.pendingRequests.get(msgId)!;
+            this.pendingRequests.delete(msgId);
+            const isSuccess = res.success !== undefined ? res.success : res.Success;
+            const resData = res.data !== undefined ? res.data : res.Data;
+            const resError = res.error || res.Error;
+            if (isSuccess) {
+              resolve(resData);
             } else {
-              reject(new Error(res.error || 'Native bridge error'));
+              reject(new Error(resError || 'Native bridge error'));
             }
           }
         } catch (e) {

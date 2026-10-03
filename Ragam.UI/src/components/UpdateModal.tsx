@@ -13,8 +13,17 @@ export const UpdateModal: React.FC = () => {
 
   const runCheck = async (manual = false) => {
     try {
-      const info = await bridge.checkForUpdates();
-      if (info && info.hasUpdate) {
+      const rawInfo: any = await bridge.checkForUpdates();
+      const hasUpdate = Boolean(rawInfo?.hasUpdate ?? rawInfo?.HasUpdate);
+      const info: UpdateInfo | null = rawInfo ? {
+        hasUpdate,
+        currentVersion: rawInfo.currentVersion ?? rawInfo.CurrentVersion ?? '',
+        latestVersion: rawInfo.latestVersion ?? rawInfo.LatestVersion ?? '',
+        releaseNotes: rawInfo.releaseNotes ?? rawInfo.ReleaseNotes ?? '',
+        downloadUrl: rawInfo.downloadUrl ?? rawInfo.DownloadUrl ?? '',
+        publishedAt: rawInfo.publishedAt ?? rawInfo.PublishedAt ?? ''
+      } : null;
+      if (info && hasUpdate) {
         setUpdateInfo(info);
         setIsOpen(true);
       } else if (manual) {

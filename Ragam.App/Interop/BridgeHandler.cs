@@ -11,6 +11,11 @@ namespace Ragam.App.Interop;
 
 public class BridgeHandler
 {
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
 
@@ -61,7 +66,7 @@ public class BridgeHandler
         try
         {
             var eventObj = new { isEvent = true, eventName, payload };
-            var json = JsonSerializer.Serialize(eventObj);
+            var json = JsonSerializer.Serialize(eventObj, _jsonOptions);
             _window.Dispatcher.Invoke(() =>
             {
                 _webView.CoreWebView2.PostWebMessageAsJson(json);
@@ -377,7 +382,7 @@ public class BridgeHandler
             }
 
             var response = new BridgeResponse(req.Id, error == null, responseData, error);
-            var jsonResponse = JsonSerializer.Serialize(response);
+            var jsonResponse = JsonSerializer.Serialize(response, _jsonOptions);
             _webView.CoreWebView2.PostWebMessageAsJson(jsonResponse);
         }
         catch (Exception ex)
