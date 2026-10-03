@@ -1,6 +1,6 @@
 # 🎵 RAGAM
 
-A modern, fast, subscription-free desktop music player built with **.NET 8 (C#)**, **Microsoft WebView2**, and **React 19 (TypeScript)**.
+A modern, fast, source-available desktop music player built with **.NET 8 (C#)**, **Microsoft WebView2**, and **React 19 (TypeScript)**.
 
 ---
 
@@ -107,7 +107,7 @@ dotnet run
 
 ## 📄 License & Terms of Use
 
-This project is licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)**.
+This project is licensed under the **[PolyForm Noncommercial License 1.0.0](LICENSE)** (Source-Available with Noncommercial Restrictions).
 
-- ✅ **Permitted**: Personal use, learning, research, non-commercial modification, and contributions.
-- ❌ **Prohibited**: Any commercial use, selling, monetization, subscription gating, or financial gain derived from this software or its source code.
+- ✅ **Permitted**: Personal use, learning, non-commercial research, non-commercial modifications, and open contributions.
+- ❌ **Strictly Prohibited**: Any commercial use, business application, selling, paid distribution, monetization, subscription gating, or financial gain derived from this software, its binary distributions, or its source code.
