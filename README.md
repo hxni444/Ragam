@@ -25,7 +25,7 @@ Get the latest version of RAGAM instantly. Built-in auto-updates will keep your 
 - 📋 **Library & Offline Playlists**: Manage favorites, custom playlists, and local listening history stored in a local-first SQLite database.
 - 🔄 **Automatic Self-Updates**: Built-in delta updates powered by Velopack that download in seconds without manual reinstalls.
 - 🎮 **Discord Rich Presence**: Live "Listening to..." activity status on Discord with song titles, artists, and live album art.
-- 🚀 **100% Standalone Executable**: Self-contained single-file `.exe` with embedded UI assets — zero installation or external dependencies required.
+- 🚀 **Fast & Native Windows App**: Lightweight, self-contained desktop experience with instant startup and smooth performance.
 
 ---
 
