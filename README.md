@@ -24,7 +24,6 @@ Get the latest version of RAGAM instantly. Built-in auto-updates will keep your 
 - 🎨 **Sleek Glassmorphic UI**: Modern dark design system in theme orange (`#FF5400`), smooth micro-interactions, liquid frosted glass headers, and a custom frameless window with native Aero Snap support.
 - 📋 **Library & Offline Playlists**: Manage favorites, custom playlists, and local listening history stored in a local-first SQLite database.
 - 🔄 **Seamless Auto-Updates**: Fast delta updates powered by Velopack that download and apply in seconds.
-- 🎮 **Discord Rich Presence**: Live "Listening to..." activity status on Discord with song titles, artists, and live album art.
 - 🚀 **Fast & Native Windows App**: Lightweight, self-contained desktop experience with instant startup and smooth performance.
 
 ---
