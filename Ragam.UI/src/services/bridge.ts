@@ -25,7 +25,7 @@ declare global {
 
 
 class NativeBridge {
-  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.8';
+  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.0.9';
   private pendingRequests = new Map<string, { resolve: (data: any) => void; reject: (err: any) => void }>();
   private eventListeners = new Map<string, Set<(payload: any) => void>>();
   private isNativeAvailable = false;
@@ -290,6 +290,17 @@ class NativeBridge {
     if (this.isNativeAvailable) {
       this.send('window_close');
     }
+  }
+
+  public updatePlaybackState(state: {
+    hasTrack: boolean;
+    isPlaying: boolean;
+    title?: string;
+    artist?: string;
+    thumbnailUrl?: string;
+    progress?: number;
+  }): Promise<{ success: boolean }> {
+    return this.send('update_playback_state', state);
   }
 
   // Fallback mock data when running in standalone browser

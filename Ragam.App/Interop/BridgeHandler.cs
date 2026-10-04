@@ -32,6 +32,7 @@ public class BridgeHandler
     private readonly DatabaseService _databaseService;
     private readonly DiscordRpcService _discordService;
     private readonly UpdateService _updateService;
+    private readonly TaskbarService _taskbarService;
     private readonly AuthService _authService = new();
     private readonly Window _window;
     private readonly WebView2 _webView;
@@ -45,7 +46,8 @@ public class BridgeHandler
         LyricsService lyricsService,
         DatabaseService databaseService,
         DiscordRpcService discordService,
-        UpdateService updateService)
+        UpdateService updateService,
+        TaskbarService taskbarService)
     {
         _window = window;
         _webView = webView;
@@ -56,6 +58,11 @@ public class BridgeHandler
         _databaseService = databaseService;
         _discordService = discordService;
         _updateService = updateService;
+        _taskbarService = taskbarService;
+
+        _taskbarService.OnPrevious += () => SendEvent("media_prev", new { });
+        _taskbarService.OnTogglePlay += () => SendEvent("media_toggle_play", new { });
+        _taskbarService.OnNext += () => SendEvent("media_next", new { });
     }
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, HomeFeedDto> _cachedChipFeeds = new();
@@ -440,6 +447,18 @@ public class BridgeHandler
                         {
                             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(extUrl) { UseShellExecute = true });
                         }
+                        responseData = new { success = true };
+                        break;
+
+                    case "update_playback_state":
+                        var hasTrack = req.Payload.TryGetProperty("hasTrack", out var htProp) && htProp.GetBoolean();
+                        var isPlaying = req.Payload.TryGetProperty("isPlaying", out var ipProp) && ipProp.GetBoolean();
+                        var pTitle = req.Payload.TryGetProperty("title", out var ptProp) ? ptProp.GetString() : null;
+                        var pArtist = req.Payload.TryGetProperty("artist", out var paProp) ? paProp.GetString() : null;
+                        var pThumb = req.Payload.TryGetProperty("thumbnailUrl", out var pthProp) ? pthProp.GetString() : null;
+                        var progress = req.Payload.TryGetProperty("progress", out var prProp) ? prProp.GetDouble() : 0.0;
+
+                        _taskbarService.UpdatePlaybackState(hasTrack, isPlaying, pTitle, pArtist, pThumb, progress);
                         responseData = new { success = true };
                         break;
 

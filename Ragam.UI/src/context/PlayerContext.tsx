@@ -583,6 +583,47 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlay, toggleMute, currentTime, duration, volume]);
 
+  // Taskbar / Native Bridge Media Controls
+  useEffect(() => {
+    const unsubToggle = bridge.on('media_toggle_play', () => {
+      togglePlay();
+    });
+    const unsubPlay = bridge.on('media_play', () => {
+      if (!isPlaying) togglePlay();
+    });
+    const unsubPause = bridge.on('media_pause', () => {
+      if (isPlaying) togglePlay();
+    });
+    const unsubNext = bridge.on('media_next', () => {
+      nextTrackInternal();
+    });
+    const unsubPrev = bridge.on('media_prev', () => {
+      prevTrackInternal();
+    });
+
+    return () => {
+      unsubToggle();
+      unsubPlay();
+      unsubPause();
+      unsubNext();
+      unsubPrev();
+    };
+  }, [isPlaying, currentTrack, queue, queueIndex]);
+
+  // Sync playback state & progress to Native Taskbar
+  useEffect(() => {
+    const hasTrack = !!currentTrack;
+    const progress = duration > 0 ? currentTime / duration : 0;
+    bridge.updatePlaybackState({
+      hasTrack,
+      isPlaying,
+      title: currentTrack?.title,
+      artist: currentTrack?.artist,
+      thumbnailUrl: currentTrack?.thumbnailUrl,
+      progress
+    }).catch(() => {});
+  }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.thumbnailUrl, isPlaying, Math.floor(currentTime), duration]);
+
   return (
     <PlayerContext.Provider
       value={{

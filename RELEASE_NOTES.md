@@ -1,7 +1,10 @@
-# RAGAM v2.0.8 Release Notes
+# RAGAM v2.0.9 Release Notes
 
 ### What's New
-- **Streamlined Mood Category Header**: Removed redundant back button in the category hero header for a clean, minimalist design with vibrant accent stripes.
-- **Reliable Update Check Timeout**: Extended bridge request timeouts so background GitHub Release checks complete smoothly without premature frontend drop-offs.
-- **Synchronized Update Status**: Real-time update checking indicator on the version pill in the sidebar.
-- **Moods & Genres Explorer**: Seamlessly browse curated playlists, mixes, albums, and tracks with instant filtering across all categories.
+- **Windows Taskbar Thumbnail Mini-Player Controls**: Hovering over the RAGAM taskbar icon displays interactive media control buttons:
+  - ⏮ **Previous Track**
+  - ⏯ **Play / Pause** (dynamic icon & tooltip)
+  - ⏭ **Next Track**
+- **Taskbar Progress Bar**: Real-time track playback progress directly on the taskbar icon.
+- **Dynamic Track Title**: Active song title and artist displayed in the window title and taskbar tooltip.
+- **Performance & Media Bridge Sync**: Instant playback event and state synchronization between the web UI and Windows Shell.

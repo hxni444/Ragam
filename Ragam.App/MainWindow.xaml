@@ -16,6 +16,15 @@
         WindowStyle="None"
         AllowsTransparency="False"
         ResizeMode="CanResize">
+    <Window.TaskbarItemInfo>
+        <TaskbarItemInfo x:Name="AppTaskbarInfo">
+            <TaskbarItemInfo.ThumbButtonInfos>
+                <ThumbButtonInfo x:Name="ThumbPrev" Description="Previous Track" IsEnabled="False" />
+                <ThumbButtonInfo x:Name="ThumbPlayPause" Description="Play" IsEnabled="False" />
+                <ThumbButtonInfo x:Name="ThumbNext" Description="Next Track" IsEnabled="False" />
+            </TaskbarItemInfo.ThumbButtonInfos>
+        </TaskbarItemInfo>
+    </Window.TaskbarItemInfo>
     <WindowChrome.WindowChrome>
         <WindowChrome 
             CaptionHeight="0"

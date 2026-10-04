@@ -18,12 +18,15 @@ public partial class MainWindow : Window
     private readonly DatabaseService _databaseService = new();
     private readonly DiscordRpcService _discordService = new();
     private readonly UpdateService _updateService = new();
+    private readonly TaskbarService _taskbarService;
 
     public MainWindow()
     {
         InitializeComponent();
         AppDbContext.InitializeDatabase();
         _discordService.Initialize();
+        _taskbarService = new TaskbarService(this);
+        _taskbarService.Initialize();
 
         Loaded += MainWindow_Loaded;
         StateChanged += MainWindow_StateChanged;
@@ -55,7 +58,8 @@ public partial class MainWindow : Window
                 _lyricsService,
                 _databaseService,
                 _discordService,
-                _updateService
+                _updateService,
+                _taskbarService
             );
 
             MainWebView.CoreWebView2.WebMessageReceived += async (s, args) =>
