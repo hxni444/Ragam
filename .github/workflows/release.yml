@@ -75,6 +75,22 @@ jobs:
         run: |
           dotnet publish Ragam.App/Ragam.App.csproj -c Release -r win-x64 --self-contained true -o ./publish /p:Version=${{ steps.get_version.outputs.version }}
 
+      - name: Prepare Release Directory & Download Prior Releases
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if (Test-Path "./release") {
+            Remove-Item -Recurse -Force "./release"
+          }
+          New-Item -ItemType Directory -Path "./release" -Force
+
+          try {
+            vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token $env:GITHUB_TOKEN --outputDir "./release"
+          } catch {
+            Write-Host "Prior release download skipped or not found. Continuing with fresh release."
+          }
+
       - name: Package with Velopack
         shell: pwsh
         run: |
