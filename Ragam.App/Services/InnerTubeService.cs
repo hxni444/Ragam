@@ -1607,6 +1607,213 @@ public class InnerTubeService
         return "";
     }
 
+    public async Task<List<TrackDto>> GetSmartRadioAsync(string videoId, string? playlistId = null)
+    {
+        var tracks = new List<TrackDto>();
+        try
+        {
+            var targetPlaylistId = !string.IsNullOrEmpty(playlistId) ? playlistId : $"RDAMVM{videoId}";
+            var req = new HttpRequestMessage(HttpMethod.Post, "https://music.youtube.com/youtubei/v1/next?prettyPrint=false");
+            ApplyHeaders(req);
+
+            var clientDict = new Dictionary<string, object?>
+            {
+                ["clientName"] = "WEB_REMIX",
+                ["clientVersion"] = "1.20260114.01.00",
+                ["hl"] = "en",
+                ["gl"] = "US"
+            };
+
+            if (!string.IsNullOrEmpty(_session.VisitorData))
+            {
+                clientDict["visitorData"] = _session.VisitorData;
+            }
+
+            var contextBody = new Dictionary<string, object?>
+            {
+                ["context"] = new Dictionary<string, object?>
+                {
+                    ["client"] = clientDict,
+                    ["user"] = new Dictionary<string, object?>
+                    {
+                        ["onBehalfOfUser"] = _session.DataSyncId
+                    }
+                },
+                ["videoId"] = videoId,
+                ["playlistId"] = targetPlaylistId,
+                ["isAudioOnly"] = true,
+                ["tunerSettingValue"] = "AUTOMIX_SETTING_NORMAL"
+            };
+
+            req.Content = new StringContent(JsonSerializer.Serialize(contextBody), Encoding.UTF8, "application/json");
+
+            var res = await _httpClient.SendAsync(req);
+            if (res.IsSuccessStatusCode)
+            {
+                using var stream = await res.Content.ReadAsStreamAsync();
+                using var doc = await JsonDocument.ParseAsync(stream);
+                ExtractRadioTracks(doc.RootElement, tracks);
+            }
+
+            // If only current track or very few returned, try fetching automix radio playlist directly
+            if (tracks.Count <= 2 && !targetPlaylistId.StartsWith("RDAMVM"))
+            {
+                var fallbackTracks = await GetSmartRadioAsync(videoId, $"RDAMVM{videoId}");
+                if (fallbackTracks.Count > 0)
+                {
+                    foreach (var ft in fallbackTracks)
+                    {
+                        if (!tracks.Any(t => t.Id == ft.Id))
+                        {
+                            tracks.Add(ft);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error fetching Smart Radio: {ex.Message}");
+        }
+
+        return tracks;
+    }
+
+    private static void ExtractRadioTracks(JsonElement root, List<TrackDto> tracks)
+    {
+        if (root.ValueKind != JsonValueKind.Object) return;
+        TraverseAndExtractRadio(root, tracks);
+    }
+
+    private static void TraverseAndExtractRadio(JsonElement element, List<TrackDto> tracks)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            if (element.TryGetProperty("playlistPanelVideoRenderer", out var ppvr))
+            {
+                var t = ParsePlaylistPanelVideo(ppvr);
+                if (t != null && !tracks.Any(existing => existing.Id == t.Id))
+                {
+                    tracks.Add(t);
+                }
+            }
+            else if (element.TryGetProperty("musicResponsiveListItemRenderer", out var resp))
+            {
+                var t = ParseResponsiveTrackItem(resp);
+                if (t != null && !tracks.Any(existing => existing.Id == t.Id))
+                {
+                    tracks.Add(t);
+                }
+            }
+            else
+            {
+                foreach (var prop in element.EnumerateObject())
+                {
+                    TraverseAndExtractRadio(prop.Value, tracks);
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                TraverseAndExtractRadio(item, tracks);
+            }
+        }
+    }
+
+    private static TrackDto? ParsePlaylistPanelVideo(JsonElement renderer)
+    {
+        try
+        {
+            string? videoId = null;
+            if (renderer.TryGetProperty("videoId", out var vidProp))
+            {
+                videoId = vidProp.GetString();
+            }
+            else if (renderer.TryGetProperty("navigationEndpoint", out var nav) &&
+                     nav.TryGetProperty("watchEndpoint", out var we) &&
+                     we.TryGetProperty("videoId", out var weVid))
+            {
+                videoId = weVid.GetString();
+            }
+
+            if (string.IsNullOrEmpty(videoId)) return null;
+
+            string title = "Unknown Title";
+            if (renderer.TryGetProperty("title", out var titleObj) &&
+                titleObj.TryGetProperty("runs", out var tRuns) && tRuns.GetArrayLength() > 0)
+            {
+                title = tRuns[0].GetProperty("text").GetString() ?? title;
+            }
+
+            string artist = "Various Artists";
+            string? album = null;
+
+            if (renderer.TryGetProperty("longBylineText", out var lblObj) &&
+                lblObj.TryGetProperty("runs", out var lblRuns) && lblRuns.GetArrayLength() > 0)
+            {
+                artist = lblRuns[0].GetProperty("text").GetString() ?? artist;
+                if (lblRuns.GetArrayLength() >= 3)
+                {
+                    var albCandidate = lblRuns[2].GetProperty("text").GetString();
+                    if (!string.IsNullOrEmpty(albCandidate) && albCandidate != "•")
+                    {
+                        album = albCandidate;
+                    }
+                }
+            }
+            else if (renderer.TryGetProperty("shortBylineText", out var sblObj) &&
+                     sblObj.TryGetProperty("runs", out var sblRuns) && sblRuns.GetArrayLength() > 0)
+            {
+                artist = sblRuns[0].GetProperty("text").GetString() ?? artist;
+            }
+
+            double duration = 180;
+            if (renderer.TryGetProperty("lengthText", out var lenObj) &&
+                lenObj.TryGetProperty("runs", out var lenRuns) && lenRuns.GetArrayLength() > 0)
+            {
+                var lenStr = lenRuns[0].GetProperty("text").GetString();
+                duration = ParseDurationSeconds(lenStr);
+            }
+
+            string thumb = $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg";
+            if (renderer.TryGetProperty("thumbnail", out var thumbObj) &&
+                thumbObj.TryGetProperty("thumbnails", out var thumbs) && thumbs.GetArrayLength() > 0)
+            {
+                var highest = thumbs[thumbs.GetArrayLength() - 1];
+                if (highest.TryGetProperty("url", out var u))
+                {
+                    thumb = u.GetString() ?? thumb;
+                }
+            }
+
+            return new TrackDto(
+                Id: videoId,
+                Title: title,
+                Artist: artist,
+                Album: album,
+                DurationSeconds: duration,
+                ThumbnailUrl: thumb
+            );
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static double ParseDurationSeconds(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return 180;
+        var parts = text.Trim().Split(':');
+        if (parts.Length == 2 && double.TryParse(parts[0], out var m) && double.TryParse(parts[1], out var s))
+            return m * 60 + s;
+        if (parts.Length == 3 && double.TryParse(parts[0], out var h) && double.TryParse(parts[1], out var m2) && double.TryParse(parts[2], out var s2))
+            return h * 3600 + m2 * 60 + s2;
+        return 180;
+    }
+
     private void ApplyHeaders(HttpRequestMessage req)
     {
         req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36");

@@ -25,7 +25,7 @@ declare global {
 
 
 class NativeBridge {
-  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.0';
+  public appVersion: string = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.1';
   private pendingRequests = new Map<string, { resolve: (data: any) => void; reject: (err: any) => void }>();
   private eventListeners = new Map<string, Set<(payload: any) => void>>();
   private isNativeAvailable = false;
@@ -127,6 +127,10 @@ class NativeBridge {
 
   public getStreamUrl(trackId: string): Promise<{ url: string | null }> {
     return this.send<{ url: string | null }>('get_stream_url', { id: trackId });
+  }
+
+  public getSmartRadio(videoId: string, title?: string, artist?: string, playlistId?: string): Promise<Track[]> {
+    return this.send<Track[]>('get_smart_radio', { videoId, title, artist, playlistId });
   }
 
   public prefetchStreams(trackIds: string[]): Promise<{ success: boolean }> {
@@ -410,6 +414,10 @@ class NativeBridge {
           { timeMs: 16000, text: "Tu na jaane dil ka jahaan" }
         ]
       } as unknown as T;
+    }
+
+    if (action === 'get_smart_radio') {
+      return sampleTracks as unknown as T;
     }
 
     if (action === 'search') {

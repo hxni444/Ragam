@@ -1,10 +1,23 @@
 import React from 'react';
-import { X, Play, Pause, ListMusic, Loader2 } from 'lucide-react';
+import { X, Play, Pause, ListMusic, Loader2, Radio } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { AddToLibraryMenu } from './AddToLibraryMenu';
 
 export const QueueDrawer: React.FC = () => {
-  const { queue, queueIndex, currentTrack, isPlaying, isLoading, isQueueOpen, setIsQueueOpen, playTrack, togglePlay } = usePlayer();
+  const { 
+    queue, 
+    queueIndex, 
+    currentTrack, 
+    isPlaying, 
+    isLoading, 
+    isQueueOpen, 
+    setIsQueueOpen, 
+    playTrack, 
+    togglePlay,
+    isSmartRadioActive,
+    isSmartRadioLoading,
+    startSmartRadio
+  } = usePlayer();
 
   if (!isQueueOpen) return null;
 
@@ -28,7 +41,7 @@ export const QueueDrawer: React.FC = () => {
       boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.6)'
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <ListMusic size={22} color="var(--primary)" />
           <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>Play Queue</h3>
@@ -46,6 +59,76 @@ export const QueueDrawer: React.FC = () => {
           <X size={18} />
         </button>
       </div>
+
+      {/* Radio Mix Banner - Only shown when Radio is active */}
+      {isSmartRadioActive && currentTrack && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 12px',
+          marginBottom: '16px',
+          borderRadius: '10px',
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          transition: 'all 0.2s ease'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '30px',
+              height: '30px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--primary)'
+            }}>
+              {isSmartRadioLoading ? <Loader2 size={16} className="animate-spin" /> : <Radio size={16} />}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>
+                Radio Mix
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-subdued)' }}>
+                Queue similar tracks based on this song
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => startSmartRadio()}
+            disabled={isSmartRadioLoading}
+            style={{
+              background: 'var(--primary)',
+              border: 'none',
+              color: '#000',
+              fontSize: '12px',
+              fontWeight: 700,
+              padding: '6px 14px',
+              borderRadius: '20px',
+              cursor: isSmartRadioLoading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: isSmartRadioLoading ? 0.7 : 1,
+              transition: 'transform 0.15s ease'
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.04)')}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            title="Mix similar songs into queue"
+          >
+            {isSmartRadioLoading ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>Mixing...</span>
+              </>
+            ) : (
+              <span>Mix Now</span>
+            )}
+          </button>
+        </div>
+      )}
 
       <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {/* Section 1: Now Playing */}
@@ -180,6 +263,21 @@ export const QueueDrawer: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => startSmartRadio(track)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-subdued)',
+                        cursor: 'pointer',
+                        padding: '4px'
+                      }}
+                      title={`Start Smart Radio from ${track.title}`}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-subdued)')}
+                    >
+                      <Radio size={15} />
+                    </button>
                     <AddToLibraryMenu track={track} iconSize={15} />
                     <button
                       onClick={() => playTrack(track, queue)}

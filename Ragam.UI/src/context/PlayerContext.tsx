@@ -51,6 +51,8 @@ const loadSavedPlayerState = (): SavedPlayerState => {
   };
 };
 
+const STORAGE_KEY_AUTOPLAY_RADIO = 'ragam_autoplay_radio_v1';
+
 interface PlayerContextType {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -68,6 +70,13 @@ interface PlayerContextType {
   isQueueOpen: boolean;
   isExpanded: boolean;
   isFavorite: boolean;
+  isSmartRadioActive: boolean;
+  isSmartRadioLoading: boolean;
+  isAutoplayRadioEnabled: boolean;
+  setIsAutoplayRadioEnabled: (val: boolean) => void;
+  startSmartRadio: (track?: Track) => Promise<void>;
+  stopSmartRadio: () => void;
+  toggleSmartRadio: (track?: Track) => Promise<void>;
   playTrack: (track: Track, newQueue?: Track[]) => Promise<void>;
   togglePlay: () => void;
   seek: (seconds: number) => void;
@@ -107,6 +116,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isQueueOpen, setIsQueueOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isSmartRadioActive, setIsSmartRadioActive] = useState(false);
+  const [isSmartRadioLoading, setIsSmartRadioLoading] = useState(false);
+  const [isAutoplayRadioEnabled, setIsAutoplayRadioEnabledState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_AUTOPLAY_RADIO);
+      return saved !== null ? JSON.parse(saved) : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const setIsAutoplayRadioEnabled = (val: boolean) => {
+    setIsAutoplayRadioEnabledState(val);
+    try {
+      localStorage.setItem(STORAGE_KEY_AUTOPLAY_RADIO, JSON.stringify(val));
+    } catch {}
+  };
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -295,6 +321,95 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const startSmartRadio = async (track?: Track) => {
+    const seedTrack = track || currentTrackRef.current;
+    if (!seedTrack) return;
+
+    setIsSmartRadioLoading(true);
+    setIsSmartRadioActive(true);
+
+    try {
+      const radioTracks = await bridge.getSmartRadio(seedTrack.id, seedTrack.title, seedTrack.artist);
+      const filteredRadio = (radioTracks || []).filter((t) => t.id !== seedTrack.id);
+
+      if (filteredRadio.length > 0) {
+        if (currentTrackRef.current?.id === seedTrack.id) {
+          // Current track is already playing: keep playing, seamlessly replace upcoming tracks with smart radio mix
+          const currIdx = queueIndexRef.current;
+          const currentQueue = queueRef.current;
+          const newQueue = [...currentQueue.slice(0, currIdx + 1), ...filteredRadio];
+          setQueue(newQueue);
+          queueRef.current = newQueue;
+          prefetchUpcoming(newQueue, currIdx);
+        } else {
+          // Start playing seed track and initialize smart radio queue
+          const newQueue = [seedTrack, ...filteredRadio];
+          await playTrackInternal(seedTrack, newQueue, 0);
+        }
+      } else {
+        if (currentTrackRef.current?.id !== seedTrack.id) {
+          await playTrackInternal(seedTrack, [seedTrack], 0);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to start smart radio:', err);
+    } finally {
+      setIsSmartRadioLoading(false);
+    }
+  };
+
+  const stopSmartRadio = () => {
+    setIsSmartRadioActive(false);
+  };
+
+  const toggleSmartRadio = async (track?: Track) => {
+    if (isSmartRadioActive && (!track || track.id === currentTrackRef.current?.id)) {
+      stopSmartRadio();
+    } else {
+      await startSmartRadio(track);
+    }
+  };
+
+  const autoExtendRadioRef = useRef(false);
+
+  // Auto-extend queue with smart radio recommendations when nearing the end and radio is active
+  useEffect(() => {
+    const checkAutoExtend = async () => {
+      if (!isSmartRadioActive || autoExtendRadioRef.current) return;
+      const q = queueRef.current;
+      const currIdx = queueIndexRef.current;
+      if (q.length === 0) return;
+
+      // Trigger when 1 or 0 tracks remain in queue
+      if (currIdx >= q.length - 2) {
+        const seed = q[q.length - 1] || currentTrackRef.current;
+        if (!seed) return;
+
+        autoExtendRadioRef.current = true;
+        try {
+          const radioTracks = await bridge.getSmartRadio(seed.id, seed.title, seed.artist);
+          const existingIds = new Set(queueRef.current.map((t) => t.id));
+          const freshTracks = (radioTracks || []).filter((t) => !existingIds.has(t.id));
+
+          if (freshTracks.length > 0) {
+            setQueue((prev) => {
+              const updated = [...prev, ...freshTracks];
+              queueRef.current = updated;
+              return updated;
+            });
+            setIsSmartRadioActive(true);
+          }
+        } catch (err) {
+          console.warn('Failed to auto-extend smart radio queue:', err);
+        } finally {
+          autoExtendRadioRef.current = false;
+        }
+      }
+    };
+
+    checkAutoExtend();
+  }, [queueIndex, queue.length, isSmartRadioActive]);
+
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     return playTrackInternal(track, newQueue);
   };
@@ -314,6 +429,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       playTrackInternal(q[currIdx + 1], q, currIdx + 1);
     } else if (repeatModeRef.current === 'all') {
       playTrackInternal(q[0], q, 0);
+    } else if (isSmartRadioActive && currentTrackRef.current) {
+      startSmartRadio(currentTrackRef.current);
     }
   };
 
@@ -642,6 +759,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isLyricsOpen,
         isQueueOpen,
         isFavorite,
+        isSmartRadioActive,
+        isSmartRadioLoading,
+        isAutoplayRadioEnabled,
+        setIsAutoplayRadioEnabled,
+        startSmartRadio,
+        stopSmartRadio,
+        toggleSmartRadio,
         playTrack,
         togglePlay,
         seek,

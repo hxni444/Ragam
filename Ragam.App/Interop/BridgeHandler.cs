@@ -321,6 +321,35 @@ public class BridgeHandler
                         responseData = new { url = streamUrl };
                         break;
 
+                    case "get_smart_radio":
+                        var radioVid = req.Payload.TryGetProperty("videoId", out var rvp) ? rvp.GetString() : "";
+                        var radioPlId = req.Payload.TryGetProperty("playlistId", out var rpp) ? rpp.GetString() : null;
+                        var songTitle = req.Payload.TryGetProperty("title", out var stp) ? stp.GetString() : "";
+                        var songArtist = req.Payload.TryGetProperty("artist", out var sap) ? sap.GetString() : "";
+
+                        List<TrackDto> radioTracks = new();
+                        if (!string.IsNullOrEmpty(radioVid))
+                        {
+                            radioTracks = await _innerTubeService.GetSmartRadioAsync(radioVid, radioPlId);
+                        }
+
+                        // Fallback if YouTube Music returned fewer than 3 tracks
+                        if (radioTracks.Count < 3 && (!string.IsNullOrEmpty(songTitle) || !string.IsNullOrEmpty(songArtist)))
+                        {
+                            var searchQuery = $"{songTitle} {songArtist} mix".Trim();
+                            var fallbackTracks = await _youTubeService.SearchVideosOnlyAsync(searchQuery, 20);
+                            foreach (var ft in fallbackTracks)
+                            {
+                                if (ft.Id != radioVid && !radioTracks.Any(t => t.Id == ft.Id))
+                                {
+                                    radioTracks.Add(ft);
+                                }
+                            }
+                        }
+
+                        responseData = radioTracks;
+                        break;
+
                     case "prefetch_streams":
                         if (req.Payload.TryGetProperty("ids", out var idsProp) && idsProp.ValueKind == JsonValueKind.Array)
                         {

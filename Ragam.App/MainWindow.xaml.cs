@@ -37,10 +37,23 @@ public partial class MainWindow : Window
     {
         try
         {
-            var userDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ragam", "WebViewProfile");
-            var env = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataDir);
+            CoreWebView2Environment env;
+            var baseAppData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ragam");
+            var userDataDir = Path.Combine(baseAppData, "WebViewProfile");
 
-            await MainWebView.EnsureCoreWebView2Async(env);
+            try
+            {
+                env = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataDir);
+                await MainWebView.EnsureCoreWebView2Async(env);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Primary WebView2 init failed ({ex.Message}), attempting fallback...");
+                var fallbackDir = Path.Combine(baseAppData, "WebViewProfile_Fallback");
+                env = await CoreWebView2Environment.CreateAsync(userDataFolder: fallbackDir);
+                await MainWebView.EnsureCoreWebView2Async(env);
+            }
+
             MainWebView.CoreWebView2.Settings.IsSwipeNavigationEnabled = true;
             MainWebView.CoreWebView2.Settings.IsPinchZoomEnabled = true;
             MainWebView.CoreWebView2.NewWindowRequested += (s, args) =>

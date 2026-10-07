@@ -13,7 +13,8 @@ import {
   Heart, 
   Mic2,
   Loader2,
-  Music2
+  Music2,
+  Radio
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { AddToLibraryMenu } from './AddToLibraryMenu';
@@ -30,6 +31,9 @@ export const NowPlayingView: React.FC = () => {
     isShuffle,
     repeatMode,
     isFavorite,
+    isSmartRadioActive,
+    isSmartRadioLoading,
+    toggleSmartRadio,
     queue,
     queueIndex,
     lyrics,
@@ -224,6 +228,20 @@ export const NowPlayingView: React.FC = () => {
               title={`Repeat: ${repeatMode}`}
             >
               {repeatMode === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
+            </button>
+
+            <button 
+              className={`control-btn ${isSmartRadioActive ? 'active' : ''}`} 
+              onClick={() => toggleSmartRadio()}
+              disabled={isSmartRadioLoading}
+              title={isSmartRadioLoading ? "Finding similar songs..." : isSmartRadioActive ? "Radio Active (Click to turn off)" : "Start Radio Mix"}
+              style={isSmartRadioActive ? { color: 'var(--primary)' } : {}}
+            >
+              {isSmartRadioLoading ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <Radio size={20} />
+              )}
             </button>
           </div>
 
