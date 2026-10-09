@@ -4,14 +4,15 @@ A modern, fast, source-available desktop music player built with **.NET 8 (C#)**
 
 ---
 
-## 📥 Download RAGAM for Windows
+## 📥 Download RAGAM
 
-Get the latest version of RAGAM instantly. Built-in auto-updates will keep your player up to date automatically.
+Get the latest version of RAGAM instantly.
 
-| Package | Download Link | Description |
+| Platform / Package | Download Link | Description |
 | :--- | :--- | :--- |
 | **🚀 Windows Setup (Recommended)** | [**`Ragam-win-Setup.exe`**](https://github.com/hxni444/Ragam/raw/main/release/Ragam-win-Setup.exe) | One-click installer with automatic background updates & desktop shortcuts. |
 | **📦 Portable Edition (.zip)** | [**`Ragam-win-Portable.zip`**](https://github.com/hxni444/Ragam/raw/main/release/Ragam-win-Portable.zip) | No installation required. Unzip and run `Ragam.exe` anywhere. |
+| **📱 Android APK (arm64-v8a)** | [**`app-arm64-release.apk`**](https://github.com/hxni444/Ragam/raw/main/release/app-arm64-release.apk) | Direct APK installer for Android devices (ARM64). |
 
 > 💡 *You can also download individual releases and delta packages directly from the [**GitHub Releases Page**](https://github.com/hxni444/Ragam/releases).*
 
@@ -50,7 +51,8 @@ Ragam/
 │
 └── release/
     ├── Ragam-win-Setup.exe    # Velopack Setup Installer
-    └── Ragam-win-Portable.zip # Portable Release Bundle
+    ├── Ragam-win-Portable.zip # Portable Release Bundle
+    └── app-arm64-release.apk  # Android APK Package (ARM64)
 ```
 
 ---
