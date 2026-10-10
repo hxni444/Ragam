@@ -228,7 +228,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const immediateNext = nextTracks[0];
     if (immediateNext && !urlCacheRef.current.has(immediateNext.id)) {
-      bridge.getStreamUrl(immediateNext.id).then((res) => {
+      bridge.getStreamUrl(immediateNext.id, immediateNext.title, immediateNext.artist).then((res) => {
         if (res.url) {
           urlCacheRef.current.set(immediateNext.id, res.url);
           if (preloadAudioRef.current) {
@@ -295,7 +295,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Resolve stream URL
       let url: string | undefined = urlCacheRef.current.get(track.id) ?? undefined;
       if (!url) {
-        const res = await bridge.getStreamUrl(track.id);
+        const res = await bridge.getStreamUrl(track.id, track.title, track.artist);
         url = res?.url ?? undefined;
         if (url) {
           urlCacheRef.current.set(track.id, url);

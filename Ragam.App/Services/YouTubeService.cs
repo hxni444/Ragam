@@ -242,30 +242,65 @@ public class YouTubeService
         }
     }
 
-    public async Task<string?> GetAudioStreamUrlAsync(string videoId)
+    public async Task<string?> GetAudioStreamUrlAsync(string videoId, string? title = null, string? artist = null)
     {
+        if (string.IsNullOrWhiteSpace(videoId)) return null;
+
         if (_streamCache.TryGetValue(videoId, out var cached) && cached.Expiry > DateTime.UtcNow)
         {
             return cached.Url;
         }
 
-        try
+        // Try direct YouTube Explode resolution if it looks like a standard YouTube video ID
+        if (videoId.Length == 11 && !videoId.StartsWith("UC") && !videoId.StartsWith("MP") && !videoId.StartsWith("FE") && !videoId.StartsWith("yt_"))
         {
-            var manifest = await _youtubeClient.Videos.Streams.GetManifestAsync(videoId);
-            var audioStreamInfo = manifest.GetAudioOnlyStreams()
-                .OrderByDescending(s => s.Bitrate)
-                .FirstOrDefault();
-
-            if (audioStreamInfo != null)
+            try
             {
-                var url = audioStreamInfo.Url;
-                _streamCache[videoId] = (url, DateTime.UtcNow.AddHours(6));
-                return url;
+                var manifest = await _youtubeClient.Videos.Streams.GetManifestAsync(videoId);
+                var audioStreamInfo = manifest.GetAudioOnlyStreams()
+                    .OrderByDescending(s => s.Bitrate)
+                    .FirstOrDefault();
+
+                if (audioStreamInfo != null)
+                {
+                    var url = audioStreamInfo.Url;
+                    _streamCache[videoId] = (url, DateTime.UtcNow.AddHours(6));
+                    return url;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error resolving audio stream for {videoId}: {ex.Message}");
             }
         }
-        catch (Exception ex)
+
+        // Fallback: Search by title & artist
+        if (!string.IsNullOrEmpty(title) || !string.IsNullOrEmpty(artist))
         {
-            System.Diagnostics.Debug.WriteLine($"Error resolving audio stream for {videoId}: {ex.Message}");
+            try
+            {
+                var searchQuery = $"{title} {artist}".Trim();
+                var searchResults = await SearchVideosOnlyAsync(searchQuery, 1);
+                if (searchResults.Count > 0)
+                {
+                    var fallbackId = searchResults[0].Id;
+                    var manifest = await _youtubeClient.Videos.Streams.GetManifestAsync(fallbackId);
+                    var audioStreamInfo = manifest.GetAudioOnlyStreams()
+                        .OrderByDescending(s => s.Bitrate)
+                        .FirstOrDefault();
+
+                    if (audioStreamInfo != null)
+                    {
+                        var url = audioStreamInfo.Url;
+                        _streamCache[videoId] = (url, DateTime.UtcNow.AddHours(6));
+                        return url;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Fallback audio search failed: {ex.Message}");
+            }
         }
 
         return null;

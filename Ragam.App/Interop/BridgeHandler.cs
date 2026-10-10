@@ -317,7 +317,9 @@ public class BridgeHandler
 
                     case "get_stream_url":
                         var videoId = req.Payload.GetProperty("id").GetString() ?? "";
-                        var streamUrl = await _youTubeService.GetAudioStreamUrlAsync(videoId);
+                        var streamTitle = req.Payload.TryGetProperty("title", out var stProp) ? stProp.GetString() : null;
+                        var streamArtist = req.Payload.TryGetProperty("artist", out var saProp) ? saProp.GetString() : null;
+                        var streamUrl = await _youTubeService.GetAudioStreamUrlAsync(videoId, streamTitle, streamArtist);
                         responseData = new { url = streamUrl };
                         break;
 
@@ -384,6 +386,45 @@ public class BridgeHandler
                         break;
 
                     case "get_history":
+                        if (_innerTubeService.IsLoggedIn)
+                        {
+                            var ytHistoryTask = _innerTubeService.GetYouTubeHistoryAsync();
+                            var localHistoryTask = _databaseService.GetHistoryAsync(100);
+                            await Task.WhenAll(ytHistoryTask, localHistoryTask);
+
+                            var ytHistory = await ytHistoryTask;
+                            var localHistory = await localHistoryTask;
+
+                            var merged = new List<TrackDto>();
+                            var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                            // 1. Prioritize tracks played in Ragam (most recent plays at the top)
+                            if (localHistory != null)
+                            {
+                                foreach (var t in localHistory)
+                                {
+                                    if (!string.IsNullOrEmpty(t.Id) && seenIds.Add(t.Id))
+                                    {
+                                        merged.Add(t);
+                                    }
+                                }
+                            }
+
+                            // 2. Append remote YouTube Music history (tracks played on YouTube Music)
+                            if (ytHistory != null)
+                            {
+                                foreach (var t in ytHistory)
+                                {
+                                    if (!string.IsNullOrEmpty(t.Id) && seenIds.Add(t.Id))
+                                    {
+                                        merged.Add(t);
+                                    }
+                                }
+                            }
+
+                            responseData = merged.Count > 0 ? merged : localHistory ?? new List<TrackDto>();
+                            break;
+                        }
                         responseData = await _databaseService.GetHistoryAsync();
                         break;
 
@@ -393,6 +434,10 @@ public class BridgeHandler
                         {
                             await _databaseService.AddToHistoryAsync(histTrack);
                             _discordService.UpdatePresence(histTrack, true);
+                            if (_innerTubeService.IsLoggedIn && !string.IsNullOrEmpty(histTrack.Id))
+                            {
+                                _ = Task.Run(() => _innerTubeService.RecordPlaybackAsync(histTrack.Id));
+                            }
                         }
                         responseData = new { success = true };
                         break;
@@ -507,14 +552,18 @@ public class BridgeHandler
 
             var response = new BridgeResponse(req.Id, error == null, responseData, error);
             var jsonResponse = JsonSerializer.Serialize(response, _jsonOptions);
-            _webView.CoreWebView2.PostWebMessageAsJson(jsonResponse);
+            _window.Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    _webView.CoreWebView2.PostWebMessageAsJson(jsonResponse);
+                }
+                catch { }
+            });
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Bridge error: {ex}");
-
-
-
         }
     }
 }

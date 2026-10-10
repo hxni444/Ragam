@@ -49,7 +49,7 @@ export const PlayerBar: React.FC = () => {
     setIsLyricsOpen,
     setIsQueueOpen,
     closePlayer,
-    toggleExpanded,
+    setIsExpanded,
     isExpanded
   } = usePlayer();
 
@@ -70,12 +70,25 @@ export const PlayerBar: React.FC = () => {
     seek(pos * duration);
   };
 
+  const handleBarClick = (e: React.MouseEvent<HTMLElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, .slider-track, .slider-progress, [data-no-expand], .add-to-library-menu')) {
+      return;
+    }
+    setIsExpanded(true);
+  };
+
   return (
-    <footer className={`playerbar ${isExpanded ? "hidden-expanded" : ""}`}>
+    <footer 
+      className={`playerbar ${isExpanded ? "hidden-expanded" : ""}`}
+      onClick={handleBarClick}
+      title="Click to open Now Playing"
+      style={{ cursor: 'pointer' }}
+    >
 
       {/* Left: Track Information */}
-      <div className="player-track-info">
-        <div style={{ position: 'relative', cursor: 'pointer' }} onClick={toggleExpanded} title="Expand player (^) (Now Playing)">
+      <div className="player-track-info" onClick={() => setIsExpanded(true)} style={{ cursor: 'pointer' }}>
+        <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setIsExpanded(true)} title="Open Now Playing">
           <img 
             src={currentTrack.thumbnailUrl} 
             alt={currentTrack.title} 
@@ -85,7 +98,7 @@ export const PlayerBar: React.FC = () => {
             <ChevronUp size={16} color="#fff" />
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer' }} onClick={toggleExpanded} title="Expand player (^)">
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer' }} onClick={() => setIsExpanded(true)} title="Open Now Playing">
           <span className="player-title" title={currentTrack.title}>
             {currentTrack.title}
           </span>
@@ -93,10 +106,10 @@ export const PlayerBar: React.FC = () => {
             {currentTrack.artist}
           </span>
         </div>
-        <button className="control-btn" onClick={toggleExpanded} title="Expand Now Playing (^)" style={{ opacity: 0.75, padding: '4px' }}>
+        <button className="control-btn" onClick={() => setIsExpanded(true)} title="Open Now Playing" style={{ opacity: 0.75, padding: '4px' }}>
           <ChevronUp size={18} />
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '2px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: '2px' }} data-no-expand="true">
           <button 
             className="control-btn" 
             onClick={toggleFavorite}
@@ -110,7 +123,7 @@ export const PlayerBar: React.FC = () => {
 
       {/* Center: Controls & Scrubber */}
       <div className="player-center">
-        <div className="player-controls">
+        <div className="player-controls" data-no-expand="true">
           <button 
             className={`control-btn ${isShuffle ? 'active' : ''}`} 
             onClick={toggleShuffle}
@@ -172,7 +185,7 @@ export const PlayerBar: React.FC = () => {
           </button>
         </div>
 
-        <div className="scrubber-container">
+        <div className="scrubber-container" data-no-expand="true">
           <span className="time-label">{formatTime(currentTime)}</span>
           <div className="slider-track" onClick={handleSliderClick}>
             <div className="slider-progress" style={{ width: `${progressPercent}%` }} />
@@ -199,7 +212,7 @@ export const PlayerBar: React.FC = () => {
           <ListMusic size={16} />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }} data-no-expand="true">
           <button className="control-btn" onClick={toggleMute} title="Mute / Unmute">
             {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>

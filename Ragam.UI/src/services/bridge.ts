@@ -125,8 +125,8 @@ class NativeBridge {
     return this.send<Artist>('get_artist_details', { name, thumbnailUrl, id });
   }
 
-  public getStreamUrl(trackId: string): Promise<{ url: string | null }> {
-    return this.send<{ url: string | null }>('get_stream_url', { id: trackId });
+  public getStreamUrl(trackId: string, title?: string, artist?: string): Promise<{ url: string | null }> {
+    return this.send<{ url: string | null }>('get_stream_url', { id: trackId, title, artist });
   }
 
   public getSmartRadio(videoId: string, title?: string, artist?: string, playlistId?: string): Promise<Track[]> {
@@ -159,7 +159,10 @@ class NativeBridge {
   }
 
   public addHistory(track: Track): Promise<{ success: boolean }> {
-    return this.send<{ success: boolean }>('add_history', track);
+    return this.send<{ success: boolean }>('add_history', track).then((res) => {
+      this.notifyLibraryChange();
+      return res;
+    });
   }
 
   public getPlaylists(): Promise<Playlist[]> {

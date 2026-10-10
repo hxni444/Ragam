@@ -1314,14 +1314,43 @@ public class InnerTubeService
         string? videoId = null;
         string title = "";
         string artist = "Unknown Artist";
+        string? album = null;
         string thumb = "";
+        int durationSec = 210;
 
+        // 1. Check playlistItemData
         if (responsive.TryGetProperty("playlistItemData", out var pidObj) &&
-            pidObj.TryGetProperty("videoId", out var vidP))
+            pidObj.TryGetProperty("videoId", out var vidP) &&
+            !string.IsNullOrEmpty(vidP.GetString()))
         {
             videoId = vidP.GetString();
         }
 
+        // 2. Check top-level navigationEndpoint
+        if (string.IsNullOrEmpty(videoId) &&
+            responsive.TryGetProperty("navigationEndpoint", out var topNav) &&
+            topNav.TryGetProperty("watchEndpoint", out var topWatch) &&
+            topWatch.TryGetProperty("videoId", out var topVid) &&
+            !string.IsNullOrEmpty(topVid.GetString()))
+        {
+            videoId = topVid.GetString();
+        }
+
+        // 3. Check overlay play button
+        if (string.IsNullOrEmpty(videoId) &&
+            responsive.TryGetProperty("overlay", out var overlay) &&
+            overlay.TryGetProperty("musicItemThumbnailOverlayRenderer", out var mio) &&
+            mio.TryGetProperty("content", out var mioContent) &&
+            mioContent.TryGetProperty("musicPlayButtonRenderer", out var mpb) &&
+            mpb.TryGetProperty("playNavigationEndpoint", out var pne) &&
+            pne.TryGetProperty("watchEndpoint", out var pneWatch) &&
+            pneWatch.TryGetProperty("videoId", out var pneVid) &&
+            !string.IsNullOrEmpty(pneVid.GetString()))
+        {
+            videoId = pneVid.GetString();
+        }
+
+        // 4. Flex Columns (Title, Artist, Album)
         if (responsive.TryGetProperty("flexColumns", out var flexCols) && flexCols.GetArrayLength() > 0)
         {
             var col0 = flexCols[0];
@@ -1330,12 +1359,20 @@ public class InnerTubeService
                 t0.TryGetProperty("runs", out var runs0) && runs0.GetArrayLength() > 0)
             {
                 title = runs0[0].GetProperty("text").GetString() ?? "";
-                if (string.IsNullOrEmpty(videoId) &&
-                    runs0[0].TryGetProperty("navigationEndpoint", out var nav) &&
-                    nav.TryGetProperty("watchEndpoint", out var watch) &&
-                    watch.TryGetProperty("videoId", out var vidProp))
+
+                if (string.IsNullOrEmpty(videoId))
                 {
-                    videoId = vidProp.GetString();
+                    foreach (var run in runs0.EnumerateArray())
+                    {
+                        if (run.TryGetProperty("navigationEndpoint", out var nav) &&
+                            nav.TryGetProperty("watchEndpoint", out var watch) &&
+                            watch.TryGetProperty("videoId", out var vidProp) &&
+                            !string.IsNullOrEmpty(vidProp.GetString()))
+                        {
+                            videoId = vidProp.GetString();
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -1346,11 +1383,90 @@ public class InnerTubeService
                     fc1.TryGetProperty("text", out var t1) &&
                     t1.TryGetProperty("runs", out var runs1) && runs1.GetArrayLength() > 0)
                 {
-                    artist = runs1[0].GetProperty("text").GetString() ?? "Unknown Artist";
+                    var runsArray = runs1.EnumerateArray().ToList();
+                    if (runsArray.Count > 0)
+                    {
+                        artist = runsArray[0].TryGetProperty("text", out var aProp) ? aProp.GetString() ?? "Unknown Artist" : "Unknown Artist";
+                    }
+
+                    // Look for album or duration in subsequent runs
+                    for (int i = 1; i < runsArray.Count; i++)
+                    {
+                        var runText = runsArray[i].TryGetProperty("text", out var rTxt) ? rTxt.GetString() ?? "" : "";
+                        if (runText.Contains(":") && (runText.Length == 4 || runText.Length == 5 || runText.Length == 7 || runText.Length == 8))
+                        {
+                            durationSec = ParseDurationToSeconds(runText);
+                        }
+                        else if (!string.IsNullOrWhiteSpace(runText) && runText != "•" && !runText.Contains("views") && string.IsNullOrEmpty(album) && i >= 2)
+                        {
+                            album = runText;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(videoId))
+                    {
+                        foreach (var run in runsArray)
+                        {
+                            if (run.TryGetProperty("navigationEndpoint", out var nav) &&
+                                nav.TryGetProperty("watchEndpoint", out var watch) &&
+                                watch.TryGetProperty("videoId", out var vidProp) &&
+                                !string.IsNullOrEmpty(vidProp.GetString()))
+                            {
+                                videoId = vidProp.GetString();
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
 
+        // 5. Fixed Columns (Duration)
+        if (responsive.TryGetProperty("fixedColumns", out var fixedCols) && fixedCols.GetArrayLength() > 0)
+        {
+            var fix0 = fixedCols[0];
+            if (fix0.TryGetProperty("musicResponsiveListItemFixedColumnRenderer", out var fcr0) &&
+                fcr0.TryGetProperty("text", out var fixText) &&
+                fixText.TryGetProperty("runs", out var fixRuns) && fixRuns.GetArrayLength() > 0)
+            {
+                var dStr = fixRuns[0].GetProperty("text").GetString();
+                if (!string.IsNullOrEmpty(dStr) && dStr.Contains(":"))
+                {
+                    durationSec = ParseDurationToSeconds(dStr);
+                }
+            }
+        }
+
+        // 7. Check menu for watchEndpoint or queueTarget
+        if (string.IsNullOrEmpty(videoId) && responsive.TryGetProperty("menu", out var menu) &&
+            menu.TryGetProperty("menuRenderer", out var mr) &&
+            mr.TryGetProperty("items", out var menuItems))
+        {
+            foreach (var mi in menuItems.EnumerateArray())
+            {
+                if (mi.TryGetProperty("menuNavigationItemRenderer", out var mnir) &&
+                    mnir.TryGetProperty("navigationEndpoint", out var nav) &&
+                    nav.TryGetProperty("watchEndpoint", out var we) &&
+                    we.TryGetProperty("videoId", out var vidProp) &&
+                    !string.IsNullOrEmpty(vidProp.GetString()))
+                {
+                    videoId = vidProp.GetString();
+                    break;
+                }
+                if (mi.TryGetProperty("menuServiceItemRenderer", out var msir) &&
+                    msir.TryGetProperty("serviceEndpoint", out var se) &&
+                    se.TryGetProperty("queueAddEndpoint", out var qe) &&
+                    qe.TryGetProperty("queueTarget", out var qt) &&
+                    qt.TryGetProperty("videoId", out var qVid) &&
+                    !string.IsNullOrEmpty(qVid.GetString()))
+                {
+                    videoId = qVid.GetString();
+                    break;
+                }
+            }
+        }
+
+        // 8. Thumbnail
         if (responsive.TryGetProperty("thumbnail", out var thumbObj) &&
             thumbObj.TryGetProperty("musicThumbnailRenderer", out var mtr) &&
             mtr.TryGetProperty("thumbnail", out var tObj) &&
@@ -1361,19 +1477,35 @@ public class InnerTubeService
 
         if (thumb.StartsWith("//")) thumb = "https:" + thumb;
 
-        if (!string.IsNullOrEmpty(videoId) && !string.IsNullOrEmpty(title))
+        if (!string.IsNullOrEmpty(title))
         {
+            var finalId = !string.IsNullOrEmpty(videoId) ? videoId : $"yt_search_{Guid.NewGuid():N}";
             return new TrackDto(
-                Id: videoId,
+                Id: finalId,
                 Title: title,
                 Artist: artist,
-                Album: null,
-                DurationSeconds: 210,
-                ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg"
+                Album: album,
+                DurationSeconds: durationSec,
+                ThumbnailUrl: !string.IsNullOrEmpty(thumb) ? thumb : (!string.IsNullOrEmpty(videoId) ? $"https://i.ytimg.com/vi/{videoId}/hqdefault.jpg" : "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&h=300&fit=crop")
             );
         }
 
         return null;
+    }
+
+    private static int ParseDurationToSeconds(string? timeStr)
+    {
+        if (string.IsNullOrWhiteSpace(timeStr)) return 210;
+        var parts = timeStr.Trim().Split(':');
+        if (parts.Length == 2 && int.TryParse(parts[0], out var m) && int.TryParse(parts[1], out var s))
+        {
+            return m * 60 + s;
+        }
+        if (parts.Length == 3 && int.TryParse(parts[0], out var h) && int.TryParse(parts[1], out var m3) && int.TryParse(parts[2], out var s3))
+        {
+            return h * 3600 + m3 * 60 + s3;
+        }
+        return 210;
     }
 
     public async Task<ArtistDto?> GetArtistDetailsAsync(string artistName, string thumbnailUrl, string? artistId = null)
@@ -1538,6 +1670,165 @@ public class InnerTubeService
         }
 
         return null;
+    }
+
+    public async Task<List<TrackDto>> GetYouTubeHistoryAsync()
+    {
+        var tracks = new List<TrackDto>();
+        if (!_session.IsLoggedIn) return tracks;
+
+        try
+        {
+            using var doc = await BrowseJsonAsync("FEmusic_history");
+            if (doc != null)
+            {
+                ExtractResponsiveTracks(doc.RootElement, tracks);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error fetching YouTube history: {ex.Message}");
+        }
+
+        return tracks;
+    }
+
+    public async Task RecordPlaybackAsync(string videoId, string? playlistId = null)
+    {
+        if (!_session.IsLoggedIn || string.IsNullOrEmpty(videoId)) return;
+
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Post, "https://music.youtube.com/youtubei/v1/player?prettyPrint=false");
+            ApplyHeaders(req);
+
+            var clientDict = new Dictionary<string, object?>
+            {
+                ["clientName"] = "WEB_REMIX",
+                ["clientVersion"] = "1.20260114.01.00",
+                ["hl"] = "en",
+                ["gl"] = "US"
+            };
+
+            if (!string.IsNullOrEmpty(_session.VisitorData))
+            {
+                clientDict["visitorData"] = _session.VisitorData;
+            }
+
+            var cpn = GenerateCpn();
+
+            var body = new Dictionary<string, object>
+            {
+                ["context"] = new Dictionary<string, object?>
+                {
+                    ["client"] = clientDict,
+                    ["user"] = new Dictionary<string, object?>
+                    {
+                        ["onBehalfOfUser"] = _session.DataSyncId
+                    }
+                },
+                ["videoId"] = videoId,
+                ["cpn"] = cpn,
+                ["playbackContext"] = new Dictionary<string, object>
+                {
+                    ["contentPlaybackContext"] = new Dictionary<string, object>
+                    {
+                        ["signatureTimestamp"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                    }
+                }
+            };
+
+            if (!string.IsNullOrEmpty(playlistId))
+            {
+                body["playlistId"] = playlistId;
+            }
+
+            req.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+            var res = await _httpClient.SendAsync(req);
+
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("playbackTracking", out var pt))
+                {
+                    // 1. Playback start ping
+                    if (pt.TryGetProperty("videostatsPlaybackUrl", out var vsp) &&
+                        vsp.TryGetProperty("baseUrl", out var buProp) &&
+                        !string.IsNullOrEmpty(buProp.GetString()))
+                    {
+                        var playbackUrl = buProp.GetString()!;
+                        if (!playbackUrl.Contains("cpn="))
+                        {
+                            playbackUrl += (playbackUrl.Contains("?") ? "&" : "?") + $"cpn={cpn}&ver=2";
+                        }
+                        var trackReq = new HttpRequestMessage(HttpMethod.Get, playbackUrl);
+                        ApplyHeaders(trackReq);
+                        await _httpClient.SendAsync(trackReq);
+                    }
+
+                    // 2. Delay 5s to simulate natural listening and fire ATR (Active Tracking Request)
+                    await Task.Delay(5000);
+
+                    if (pt.TryGetProperty("atrUrl", out var atrProp) &&
+                        atrProp.TryGetProperty("baseUrl", out var atrBase) &&
+                        !string.IsNullOrEmpty(atrBase.GetString()))
+                    {
+                        var atrUrl = atrBase.GetString()!;
+                        atrUrl += (atrUrl.Contains("?") ? "&" : "?") + $"cpn={cpn}&cver=1.20260114.01.00";
+                        var atrReq = new HttpRequestMessage(HttpMethod.Post, atrUrl);
+                        ApplyHeaders(atrReq);
+                        await _httpClient.SendAsync(atrReq);
+                    }
+
+                    // 3. Delay another 7s (12s total playback) and fire Watchtime ping
+                    await Task.Delay(7000);
+
+                    if (pt.TryGetProperty("videostatsWatchtimeUrl", out var vsw) &&
+                        vsw.TryGetProperty("baseUrl", out var wProp) &&
+                        !string.IsNullOrEmpty(wProp.GetString()))
+                    {
+                        var watchUrl = wProp.GetString()!;
+                        watchUrl += (watchUrl.Contains("?") ? "&" : "?") + $"cpn={cpn}&ver=2&cmt=12.000&state=playing&st=0.000&et=12.000&rt=12&fs=0";
+                        var watchReq = new HttpRequestMessage(HttpMethod.Get, watchUrl);
+                        ApplyHeaders(watchReq);
+                        await _httpClient.SendAsync(watchReq);
+                    }
+
+                    // 4. Ptracking ping
+                    if (pt.TryGetProperty("ptrackingUrl", out var ptUrlProp) &&
+                        ptUrlProp.TryGetProperty("baseUrl", out var ptBase) &&
+                        !string.IsNullOrEmpty(ptBase.GetString()))
+                    {
+                        var ptrackUrl = ptBase.GetString()!;
+                        if (!ptrackUrl.Contains("cpn="))
+                        {
+                            ptrackUrl += (ptrackUrl.Contains("?") ? "&" : "?") + $"cpn={cpn}";
+                        }
+                        var ptReq = new HttpRequestMessage(HttpMethod.Get, ptrackUrl);
+                        ApplyHeaders(ptReq);
+                        await _httpClient.SendAsync(ptReq);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error reporting YouTube playback: {ex.Message}");
+        }
+    }
+
+    private static string GenerateCpn()
+    {
+        const string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+        var bytes = new byte[16];
+        RandomNumberGenerator.Fill(bytes);
+        var sb = new StringBuilder(16);
+        foreach (var b in bytes)
+        {
+            sb.Append(chars[b % chars.Length]);
+        }
+        return sb.ToString();
     }
 
     private static void ExtractResponsiveTracks(JsonElement element, List<TrackDto> tracks)
@@ -1827,6 +2118,11 @@ public class InnerTubeService
         if (!string.IsNullOrEmpty(_session.VisitorData))
         {
             req.Headers.Add("X-Goog-Visitor-Id", _session.VisitorData);
+        }
+
+        if (!string.IsNullOrEmpty(_session.DataSyncId))
+        {
+            req.Headers.Add("X-Goog-PageId", _session.DataSyncId);
         }
 
         if (_session.IsLoggedIn && !string.IsNullOrEmpty(_session.Cookie))
