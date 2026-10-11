@@ -23,6 +23,7 @@ import { AddToLibraryMenu } from './AddToLibraryMenu';
 export const PlayerBar: React.FC = () => {
   const {
     currentTrack,
+    remoteDeviceName,
     isPlaying,
     isLoading,
     currentTime,
@@ -104,6 +105,11 @@ export const PlayerBar: React.FC = () => {
           </span>
           <span className="player-artist" title={currentTrack.artist}>
             {currentTrack.artist}
+            {remoteDeviceName && !remoteDeviceName.toLowerCase().includes('desktop') && (
+              <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--primary)', fontWeight: 600 }}>
+                • 📱 {remoteDeviceName}
+              </span>
+            )}
           </span>
         </div>
         <button className="control-btn" onClick={() => setIsExpanded(true)} title="Open Now Playing" style={{ opacity: 0.75, padding: '4px' }}>

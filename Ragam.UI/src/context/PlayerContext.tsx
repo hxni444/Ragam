@@ -6,6 +6,7 @@ import {
   syncNowPlayingToCloud, 
   clearNowPlayingInCloud, 
   syncTrackHistoryToCloud,
+  listenToCloudNowPlaying,
   getSyncUserId,
   ensureFirebaseAuthSession
 } from '../services/firebase';
@@ -64,6 +65,7 @@ const STORAGE_KEY_AUTOPLAY_RADIO = 'ragam_autoplay_radio_v1';
 
 interface PlayerContextType {
   currentTrack: Track | null;
+  remoteDeviceName: string | null;
   isPlaying: boolean;
   isLoading: boolean;
   currentTime: number;
@@ -197,6 +199,66 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     syncUserIdRef.current = guestId;
     return guestId;
   };
+
+  const [remoteDeviceName, setRemoteDeviceName] = useState<string | null>(null);
+
+  // Subscribe to real-time cloud playback to hydrate PlayerBar from Mobile or other devices
+  useEffect(() => {
+    let unsubSnapshot: (() => void) | undefined;
+
+    const setupCloudListener = (syncId: string) => {
+      if (unsubSnapshot) unsubSnapshot();
+      unsubSnapshot = listenToCloudNowPlaying(syncId, (cloudState) => {
+        if (!cloudState || !cloudState.track) return;
+
+        // If desktop is currently playing audio locally, desktop is master
+        const isLocallyPlaying = audioRef.current && !audioRef.current.paused && audioRef.current.currentTime > 0;
+        if (isLocallyPlaying) return;
+
+        const isFromRemote = !!(cloudState.deviceName && !cloudState.deviceName.toLowerCase().includes('desktop'));
+        const isDifferentTrack = !currentTrackRef.current || currentTrackRef.current.id !== cloudState.track.id;
+
+        // Hydrate player bar if desktop is idle or update came from mobile
+        if (isDifferentTrack || isFromRemote || !currentTrackRef.current) {
+          console.log('[Cloud Hydration] Hydrating PlayerBar from remote playback:', cloudState.track.title, `(${cloudState.deviceName})`);
+          setCurrentTrack(cloudState.track);
+          currentTrackRef.current = cloudState.track;
+
+          if (cloudState.track.duration) {
+            setDuration(cloudState.track.duration);
+          }
+
+          const elapsed = cloudState.isPlaying && cloudState.timestampMs
+            ? (Date.now() - cloudState.timestampMs) / 1000
+            : 0;
+          const pos = Math.min(
+            Math.max(0, (cloudState.positionSec || 0) + elapsed),
+            cloudState.track.duration || 99999
+          );
+
+          setCurrentTime(pos);
+          currentTimeRef.current = pos;
+          setRemoteDeviceName(cloudState.deviceName || null);
+
+          // Update queue if empty
+          if (queueRef.current.length === 0 || queueRef.current.every(t => t.id !== cloudState.track?.id)) {
+            setQueue([cloudState.track]);
+            queueRef.current = [cloudState.track];
+            setQueueIndex(0);
+            queueIndexRef.current = 0;
+          }
+        }
+      });
+    };
+
+    resolveSyncUserId().then((id) => {
+      if (id) setupCloudListener(id);
+    });
+
+    return () => {
+      if (unsubSnapshot) unsubSnapshot();
+    };
+  }, []);
 
   // Track Auth user state (both Firebase & YouTube Music) for cloud sync
   useEffect(() => {
@@ -896,6 +958,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <PlayerContext.Provider
       value={{
         currentTrack,
+        remoteDeviceName,
         isPlaying,
         isLoading,
         currentTime,
