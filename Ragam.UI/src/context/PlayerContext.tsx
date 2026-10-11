@@ -1,6 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { Track, Lyrics, RepeatMode } from '../types';
 import { bridge } from '../services/bridge';
+import { 
+  auth, 
+  syncNowPlayingToCloud, 
+  clearNowPlayingInCloud, 
+  syncTrackHistoryToCloud,
+  getSyncUserId,
+  ensureFirebaseAuthSession
+} from '../services/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 const STORAGE_KEY_PLAYER_STATE = 'ragam_saved_player_state_v1';
 
@@ -143,6 +152,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const isShuffleRef = useRef<boolean>(initial.isShuffle);
   const currentTrackRef = useRef<Track | null>(initial.currentTrack);
   const currentTimeRef = useRef<number>(initial.currentTime);
+  const syncUserIdRef = useRef<string | null>(null);
 
   // Keep refs in sync
   useEffect(() => { queueRef.current = queue; }, [queue]);
@@ -151,6 +161,64 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { isShuffleRef.current = isShuffle; }, [isShuffle]);
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+
+  // Resolve sync ID from Firebase Auth OR YouTube Music session
+  const resolveSyncUserId = async (): Promise<string | null> => {
+    if (auth?.currentUser?.uid) {
+      syncUserIdRef.current = auth.currentUser.uid;
+      localStorage.setItem('ragam_user_id', auth.currentUser.uid);
+      return auth.currentUser.uid;
+    }
+    const cachedId = localStorage.getItem('ragam_user_id');
+    if (cachedId) {
+      syncUserIdRef.current = cachedId;
+      ensureFirebaseAuthSession().catch(() => {});
+      return cachedId;
+    }
+    try {
+      const bAuth = await bridge.getAuthState();
+      if (bAuth?.isLoggedIn && bAuth.userEmail) {
+        const id = getSyncUserId(bAuth.userId, bAuth.userEmail);
+        if (id) {
+          syncUserIdRef.current = id;
+          localStorage.setItem('ragam_user_id', id);
+        }
+        ensureFirebaseAuthSession().catch(() => {});
+        return id;
+      }
+    } catch {}
+    return null;
+  };
+
+  // Track Auth user state (both Firebase & YouTube Music) for cloud sync
+  useEffect(() => {
+    resolveSyncUserId().then((id) => {
+      if (id && currentTrackRef.current) {
+        syncNowPlayingToCloud(id, {
+          track: currentTrackRef.current,
+          isPlaying: isPlaying,
+          positionSec: audioRef.current?.currentTime || currentTimeRef.current || 0,
+          timestampMs: Date.now(),
+          deviceName: 'Ragam Desktop',
+          volume: volume,
+          repeatMode: repeatModeRef.current,
+          isShuffle: isShuffleRef.current
+        }).catch(() => {});
+      }
+    });
+
+    let unsub: (() => void) | undefined;
+    if (auth) {
+      unsub = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          syncUserIdRef.current = user.uid;
+        } else {
+          await resolveSyncUserId();
+        }
+      });
+    }
+    return () => { if (unsub) unsub(); };
+  }, [isPlaying, volume]);
 
   // Save player state to localStorage whenever it changes
   const savePlayerState = () => {
@@ -192,6 +260,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const handleUnload = () => {
       savePlayerState();
+      const syncId = syncUserIdRef.current;
+      if (syncId && currentTrackRef.current) {
+        syncNowPlayingToCloud(syncId, {
+          track: currentTrackRef.current,
+          isPlaying: false,
+          positionSec: audioRef.current?.currentTime || currentTimeRef.current || 0,
+          timestampMs: Date.now(),
+          deviceName: 'Ragam Desktop'
+        }).catch(() => {});
+      }
     };
     window.addEventListener('beforeunload', handleUnload);
     window.addEventListener('pagehide', handleUnload);
@@ -288,6 +366,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }).catch(console.error);
 
       bridge.addHistory(track).catch(console.error);
+
+      // Cloud Playback & Listening History Sync (works with YouTube Music & Firebase)
+      const syncId = syncUserIdRef.current || await resolveSyncUserId();
+      if (syncId) {
+        syncNowPlayingToCloud(syncId, {
+          track,
+          isPlaying: true,
+          positionSec: startFromSeconds,
+          timestampMs: Date.now(),
+          deviceName: 'Ragam Desktop',
+          volume: isMuted ? 0 : volume,
+          repeatMode: repeatModeRef.current,
+          isShuffle: isShuffleRef.current
+        }).catch(console.warn);
+
+        syncTrackHistoryToCloud(syncId, track).catch(console.warn);
+      }
 
       // Fetch lyrics in background
       bridge.getLyrics(track).then((l) => setLyrics(l)).catch(() => setLyrics(null));
@@ -484,8 +579,38 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      const syncId = syncUserIdRef.current;
+      if (syncId && currentTrackRef.current) {
+        syncNowPlayingToCloud(syncId, {
+          track: currentTrackRef.current,
+          isPlaying: true,
+          positionSec: audio.currentTime,
+          timestampMs: Date.now(),
+          deviceName: 'Ragam Desktop',
+          volume: audio.volume,
+          repeatMode: repeatModeRef.current,
+          isShuffle: isShuffleRef.current
+        }).catch(() => {});
+      }
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      const syncId = syncUserIdRef.current;
+      if (syncId && currentTrackRef.current) {
+        syncNowPlayingToCloud(syncId, {
+          track: currentTrackRef.current,
+          isPlaying: false,
+          positionSec: audio.currentTime,
+          timestampMs: Date.now(),
+          deviceName: 'Ragam Desktop',
+          volume: audio.volume,
+          repeatMode: repeatModeRef.current,
+          isShuffle: isShuffleRef.current
+        }).catch(() => {});
+      }
+    };
     const handleWaiting = () => setIsLoading(true);
     const handleCanPlay = () => setIsLoading(false);
 
@@ -535,6 +660,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // If not yet loaded, start playing from the seeked point
       setCurrentTime(seconds);
       playTrackInternal(currentTrack, queueRef.current, queueIndexRef.current, seconds);
+    }
+
+    const syncId = syncUserIdRef.current;
+    if (syncId && currentTrackRef.current) {
+      syncNowPlayingToCloud(syncId, {
+        track: currentTrackRef.current,
+        isPlaying: isPlaying,
+        positionSec: seconds,
+        timestampMs: Date.now(),
+        deviceName: 'Ragam Desktop',
+        volume: volume,
+        repeatMode: repeatModeRef.current,
+        isShuffle: isShuffleRef.current
+      }).catch(() => {});
     }
   };
 
@@ -597,6 +736,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'none';
       navigator.mediaSession.metadata = null;
+    }
+    const syncId = syncUserIdRef.current;
+    if (syncId) {
+      clearNowPlayingInCloud(syncId).catch(() => {});
     }
   };
 

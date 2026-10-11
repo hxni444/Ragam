@@ -41,6 +41,7 @@ export interface SearchResult {
 
 export interface AuthState {
   isLoggedIn: boolean;
+  userId?: string;
   userName?: string;
   userEmail?: string;
   avatarUrl?: string;

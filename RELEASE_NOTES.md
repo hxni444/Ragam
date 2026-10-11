@@ -1,14 +1,14 @@
-# RAGAM v2.1.2 Release Notes
+# RAGAM v2.1.3 Release Notes
 
 ### What's New
-- **🔄 Unified Listening History**:
-  - Seamless synchronization between tracks played inside Ragam and remote YouTube Music history.
-  - Songs played in Ragam now appear immediately at the top of your History tab.
-  - Remote listening activity from YouTube Music web and mobile apps automatically syncs into Ragam.
-  - Smart deduplication prevents duplicate plays while preserving chronological playback order.
-- **🎵 Click-to-Expand Now Playing**:
-  - Clicking anywhere on the floating PlayerBar (album cover, track info, or player bar background) now smoothly expands the full **Now Playing** overlay.
-  - Interactive player controls (Play, Next, Prev, Shuffle, Repeat, Radio, Scrubber, Volume, Like, Add to Playlist) remain protected from accidental expansion.
-- **🛡️ Resilient Audio Playback**:
-  - Fallback title and artist query resolution ensures stream playback never breaks, even for tracks with non-standard or restricted video IDs.
-  - Robust thread-safe webview message dispatching.
+- **☁️ Real-Time Mobile Playback & History Synchronization**:
+  - Connected desktop playback to Firebase Firestore with zero-polling, event-driven WebSocket streams.
+  - Automatically synchronizes currently playing song, playhead timestamps, and playback state for mobile companions.
+  - Automatically logs listening history to the cloud with full metadata and timestamps.
+- **⚡ Direct YouTube Music Sign-In**:
+  - Streamlined authentication: clicking "Sign in" directly launches the native YouTube Music sign-in window without intermediary modal dialogs.
+  - Automatic Google User ID derivation and local session caching (`ragam_user_id`) for instant cross-device matching.
+  - Silent background Firebase session handling ensuring seamless Firestore security rule validation.
+- **📱 Android Companion Architecture**:
+  - Added complete Kotlin Android sync specification with anchored playhead interpolation (`ANDROID_SYNC_IMPLEMENTATION.md`).
+

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Search, Home as HomeIcon, LogOut, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Home as HomeIcon, LogOut, User, Loader2 } from 'lucide-react';
 import type { NavigationTarget, AuthState } from '../types';
 import { bridge } from '../services/bridge';
-import { auth, mapFirebaseUserToAuthState, logoutFromFirebase } from '../services/firebase';
+import { auth, mapFirebaseUserToAuthState, logoutFromFirebase, getSyncUserId, ensureFirebaseAuthSession } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { AuthModal } from './AuthModal';
 
 interface HeaderProps {
   onNavigate: (target: NavigationTarget) => void;
@@ -27,23 +26,71 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [authState, setAuthState] = useState<AuthState>({ isLoggedIn: false });
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     // 1. Initial bridge check
-    bridge.getAuthState().then(setAuthState).catch(console.error);
+    bridge.getAuthState().then((state) => {
+      if (state && state.isLoggedIn) {
+        const userId = getSyncUserId(state.userId, state.userEmail);
+        if (userId) {
+          localStorage.setItem('ragam_user_id', userId);
+        }
+        if (state.userEmail) {
+          localStorage.setItem('ragam_user_email', state.userEmail);
+        }
+        setAuthState({
+          ...state,
+          userId: userId || undefined
+        });
+        ensureFirebaseAuthSession().catch(() => {});
+      } else {
+        setAuthState(state);
+      }
+    }).catch(console.error);
 
     // 2. Firebase persistence listener across app launches / restarts
     let unsubscribe: (() => void) | undefined;
     if (auth) {
       unsubscribe = onAuthStateChanged(auth, (user) => {
         if (user) {
-          setAuthState(mapFirebaseUserToAuthState(user));
+          const mapped = mapFirebaseUserToAuthState(user);
+          if (mapped.userId) {
+            localStorage.setItem('ragam_user_id', mapped.userId);
+          }
+          setAuthState(mapped);
         }
       });
     }
     return () => { if (unsubscribe) unsubscribe(); };
   }, []);
+
+  const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    try {
+      const state = await bridge.loginYouTube();
+      if (state && state.isLoggedIn) {
+        const userId = getSyncUserId(state.userId, state.userEmail);
+        if (userId) {
+          localStorage.setItem('ragam_user_id', userId);
+        }
+        if (state.userEmail) {
+          localStorage.setItem('ragam_user_email', state.userEmail);
+        }
+        setAuthState({
+          ...state,
+          userId: userId || undefined
+        });
+        await ensureFirebaseAuthSession().catch(() => {});
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('YouTube sign-in error:', err);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -52,8 +99,11 @@ export const Header: React.FC<HeaderProps> = ({
       console.warn('Firebase logout warning:', e);
     }
     await bridge.logout();
+    localStorage.removeItem('ragam_user_id');
+    localStorage.removeItem('ragam_user_email');
     setAuthState({ isLoggedIn: false });
     setShowUserMenu(false);
+    window.location.reload();
   };
 
   return (
@@ -161,7 +211,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         ) : (
           <button
-            onClick={() => setIsAuthModalOpen(true)}
+            onClick={handleLogin}
+            disabled={isLoggingIn}
             style={{
               background: '#ffffff',
               color: '#000000',
@@ -170,34 +221,39 @@ export const Header: React.FC<HeaderProps> = ({
               padding: '8px 22px',
               fontSize: '14px',
               fontWeight: 800,
-              cursor: 'pointer',
+              cursor: isLoggingIn ? 'default' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
               transition: 'all 0.15s ease',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+              opacity: isLoggingIn ? 0.8 : 1
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.04)';
-              e.currentTarget.style.background = '#f0f0f0';
+              if (!isLoggingIn) {
+                e.currentTarget.style.transform = 'scale(1.04)';
+                e.currentTarget.style.background = '#f0f0f0';
+              }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'scale(1)';
               e.currentTarget.style.background = '#ffffff';
             }}
           >
-            <User size={16} strokeWidth={2.5} />
-            <span>Log in</span>
+            {isLoggingIn ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                <User size={16} strokeWidth={2.5} />
+                <span>Sign in</span>
+              </>
+            )}
           </button>
         )}
       </div>
-
-      {/* In-App Authentication Dialog */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onAuthSuccess={(state) => setAuthState(state)}
-      />
     </header>
   );
 };
