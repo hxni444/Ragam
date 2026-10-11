@@ -10,7 +10,7 @@
     <RootNamespace>Ragam</RootNamespace>
     <ApplicationTitle>RAGAM</ApplicationTitle>
     <Product>RAGAM</Product>
-    <Version>2.1.3</Version>
+    <Version>2.1.4</Version>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
@@ -35,5 +35,12 @@
     </Content>
     <Resource Include="app.ico" />
   </ItemGroup>
+
+  <Target Name="SyncUiDist" BeforeTargets="BeforeBuild">
+    <ItemGroup>
+      <UiDistFiles Include="..\Ragam.UI\dist\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UiDistFiles)" DestinationFolder="wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" Condition="Exists('..\Ragam.UI\dist\index.html')" />
+  </Target>
 
 </Project>

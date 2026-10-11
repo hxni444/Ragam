@@ -108,21 +108,28 @@ public partial class MainWindow : Window
 
     private string? GetUiContentPath()
     {
-        // 1. Check folder next to the .exe
+        // 1. Check dev UI path in local development (with win-x64 runtime folder: 5 levels up)
+        var devPath5 = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "Ragam.UI", "dist"));
+        if (Directory.Exists(devPath5) && File.Exists(Path.Combine(devPath5, "index.html")))
+        {
+            return devPath5;
+        }
+
+        // 2. Check dev UI path in local development (without runtime folder: 4 levels up)
+        var devPath4 = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Ragam.UI", "dist"));
+        if (Directory.Exists(devPath4) && File.Exists(Path.Combine(devPath4, "index.html")))
+        {
+            return devPath4;
+        }
+
+        // 3. Check folder next to the .exe
         var directPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot");
         if (Directory.Exists(directPath) && File.Exists(Path.Combine(directPath, "index.html")))
         {
             return directPath;
         }
 
-        // 2. Check dev UI path if in local development
-        var devPath = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Ragam.UI", "dist"));
-        if (Directory.Exists(devPath) && File.Exists(Path.Combine(devPath, "index.html")))
-        {
-            return devPath;
-        }
-
-        // 3. Extract embedded resources to LocalAppData/Ragam/wwwroot
+        // 4. Extract embedded resources to LocalAppData/Ragam/wwwroot
         var appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ragam", "wwwroot");
         ExtractEmbeddedResources(appDataDir);
         if (Directory.Exists(appDataDir) && File.Exists(Path.Combine(appDataDir, "index.html")))

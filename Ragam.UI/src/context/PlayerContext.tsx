@@ -187,7 +187,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return id;
       }
     } catch {}
-    return null;
+
+    // Fallback: persistent guest device ID so playback is always written to Firestore immediately
+    let guestId = localStorage.getItem('ragam_device_sync_id');
+    if (!guestId) {
+      guestId = 'guest_' + Math.random().toString(36).substring(2, 10);
+      localStorage.setItem('ragam_device_sync_id', guestId);
+    }
+    syncUserIdRef.current = guestId;
+    return guestId;
   };
 
   // Track Auth user state (both Firebase & YouTube Music) for cloud sync

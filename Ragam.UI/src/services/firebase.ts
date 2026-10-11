@@ -180,7 +180,10 @@ export const syncNowPlayingToCloud = async (
   userId: string,
   state: CloudNowPlayingState
 ): Promise<void> => {
-  if (!db || !userId) return;
+  if (!db || !userId) {
+    console.warn('[Firebase Sync] Skipped: db or userId is missing', { db: !!db, userId });
+    return;
+  }
   try {
     const ref = doc(db, 'users', userId, 'playback', 'current');
     await setDoc(ref, {
@@ -188,8 +191,9 @@ export const syncNowPlayingToCloud = async (
       userId,
       updatedAt: serverTimestamp()
     }, { merge: true });
-  } catch (err) {
-    console.warn('Failed to sync now-playing state to Firebase:', err);
+    console.log(`[Firebase Sync] Updated now-playing in users/${userId}/playback/current:`, state.track?.title, `(isPlaying: ${state.isPlaying})`);
+  } catch (err: any) {
+    console.error(`[Firebase Sync Error] Failed to update now-playing (${err?.code || 'unknown'}):`, err?.message || err);
   }
 };
 
@@ -207,8 +211,9 @@ export const clearNowPlayingInCloud = async (userId: string): Promise<void> => {
       timestampMs: Date.now(),
       updatedAt: serverTimestamp()
     }, { merge: true });
-  } catch (err) {
-    console.warn('Failed to clear now-playing state in Firebase:', err);
+    console.log(`[Firebase Sync] Cleared now-playing state in users/${userId}/playback/current`);
+  } catch (err: any) {
+    console.error(`[Firebase Sync Error] Failed to clear now-playing (${err?.code || 'unknown'}):`, err?.message || err);
   }
 };
 
@@ -234,8 +239,9 @@ export const syncTrackHistoryToCloud = async (userId: string, track: Track): Pro
       playedAt: serverTimestamp(),
       device: 'Ragam Desktop'
     });
-  } catch (err) {
-    console.warn('Failed to sync track history to Firebase:', err);
+    console.log(`[Firebase Sync] Added track to users/${userId}/history:`, track.title);
+  } catch (err: any) {
+    console.error(`[Firebase Sync Error] Failed to sync history (${err?.code || 'unknown'}):`, err?.message || err);
   }
 };
 
