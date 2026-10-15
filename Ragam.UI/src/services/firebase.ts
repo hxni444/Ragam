@@ -73,10 +73,15 @@ export const db = app ? getFirestore(app) : null;
  * and signing in with Google Auth on Mobile connect to the exact same cloud record!
  */
 export const getSyncUserId = (firebaseUid?: string | null, email?: string | null): string | null => {
-  if (firebaseUid && firebaseUid.trim()) return firebaseUid.trim();
   if (email && email.trim()) {
     // Normalizes "john.doe@gmail.com" -> "u_john_doe_gmail_com"
     return 'u_' + email.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+  }
+  if (firebaseUid && firebaseUid.trim()) {
+    if (firebaseUid.includes('@')) {
+      return 'u_' + firebaseUid.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+    }
+    return firebaseUid.trim();
   }
   return null;
 };

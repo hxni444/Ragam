@@ -15,7 +15,9 @@ import {
   Mic2, 
   Heart,
   Loader2,
-  Radio
+  Radio,
+  Smartphone,
+  Laptop
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { AddToLibraryMenu } from './AddToLibraryMenu';
@@ -24,6 +26,7 @@ export const PlayerBar: React.FC = () => {
   const {
     currentTrack,
     remoteDeviceName,
+    takeControlHere,
     isPlaying,
     isLoading,
     currentTime,
@@ -103,14 +106,32 @@ export const PlayerBar: React.FC = () => {
           <span className="player-title" title={currentTrack.title}>
             {currentTrack.title}
           </span>
-          <span className="player-artist" title={currentTrack.artist}>
-            {currentTrack.artist}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span className="player-artist" title={currentTrack.artist}>
+              {currentTrack.artist}
+            </span>
             {remoteDeviceName && !remoteDeviceName.toLowerCase().includes('desktop') && (
-              <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--primary)', fontWeight: 600 }}>
-                • 📱 {remoteDeviceName}
-              </span>
+              <div 
+                className="remote-session-badge" 
+                data-no-expand="true" 
+                onClick={(e) => e.stopPropagation()}
+                title={`Playing on ${remoteDeviceName}`}
+              >
+                <Smartphone size={15} className="remote-badge-icon" />
+                <button 
+                  className="take-control-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    takeControlHere();
+                  }}
+                  title={`Transfer playback from ${remoteDeviceName} to this PC`}
+                >
+                  <Laptop size={11} />
+                  <span>Play on this PC</span>
+                </button>
+              </div>
             )}
-          </span>
+          </div>
         </div>
         <button className="control-btn" onClick={() => setIsExpanded(true)} title="Open Now Playing" style={{ opacity: 0.75, padding: '4px' }}>
           <ChevronUp size={18} />

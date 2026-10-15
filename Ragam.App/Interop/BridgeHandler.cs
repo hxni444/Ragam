@@ -214,11 +214,26 @@ public class BridgeHandler
                     case "get_auth_state":
                         if (_innerTubeService.IsLoggedIn)
                         {
+                            if (string.IsNullOrEmpty(_innerTubeService.Session.AccountEmail))
+                            {
+                                await _innerTubeService.RefreshAccountInfoAsync();
+                            }
+
+                            var email = _innerTubeService.Session.AccountEmail;
+                            var syncId = !string.IsNullOrWhiteSpace(email)
+                                ? "u_" + email.Trim().ToLowerInvariant().Replace("@", "_").Replace(".", "_")
+                                : (!string.IsNullOrWhiteSpace(_innerTubeService.Session.DataSyncId)
+                                    ? _innerTubeService.Session.DataSyncId
+                                    : (!string.IsNullOrWhiteSpace(_innerTubeService.Session.ChannelHandle)
+                                        ? "u_" + _innerTubeService.Session.ChannelHandle.Trim().TrimStart('@').ToLowerInvariant()
+                                        : "u_" + (_innerTubeService.Session.AccountName ?? "user").Trim().ToLowerInvariant().Replace(" ", "_")));
+
                             responseData = new
                             {
                                 isLoggedIn = true,
+                                userId = syncId,
                                 userName = _innerTubeService.Session.AccountName ?? "YouTube Music User",
-                                userEmail = _innerTubeService.Session.AccountEmail,
+                                userEmail = email,
                                 avatarUrl = _innerTubeService.Session.AvatarUrl ?? "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop"
                             };
                         }
@@ -238,15 +253,30 @@ public class BridgeHandler
                                 {
                                     Owner = _window
                                 };
-                                loginWin.LoginCompleted += (success) =>
+                                loginWin.LoginCompleted += async (success) =>
                                 {
                                     if (success && _innerTubeService.IsLoggedIn)
                                     {
+                                        if (string.IsNullOrEmpty(_innerTubeService.Session.AccountEmail))
+                                        {
+                                            await _innerTubeService.RefreshAccountInfoAsync();
+                                        }
+
+                                        var email = _innerTubeService.Session.AccountEmail;
+                                        var syncId = !string.IsNullOrWhiteSpace(email)
+                                            ? "u_" + email.Trim().ToLowerInvariant().Replace("@", "_").Replace(".", "_")
+                                            : (!string.IsNullOrWhiteSpace(_innerTubeService.Session.DataSyncId)
+                                                ? _innerTubeService.Session.DataSyncId
+                                                : (!string.IsNullOrWhiteSpace(_innerTubeService.Session.ChannelHandle)
+                                                    ? "u_" + _innerTubeService.Session.ChannelHandle.Trim().TrimStart('@').ToLowerInvariant()
+                                                    : "u_" + (_innerTubeService.Session.AccountName ?? "user").Trim().ToLowerInvariant().Replace(" ", "_")));
+
                                         tcs.TrySetResult(new
                                         {
                                             isLoggedIn = true,
+                                            userId = syncId,
                                             userName = _innerTubeService.Session.AccountName ?? "YouTube Music User",
-                                            userEmail = _innerTubeService.Session.AccountEmail,
+                                            userEmail = email,
                                             avatarUrl = _innerTubeService.Session.AvatarUrl ?? "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop"
                                         });
                                     }

@@ -1,16 +1,13 @@
-# RAGAM v2.1.5 Release Notes
+# RAGAM v2.1.6 Release Notes
 
 ### What's New
-- **📱 Real-Time Cross-Device Playback**:
-  - Live playback synchronization across mobile and desktop devices.
-  - Playing a track on mobile now instantly hydrates the Ragam Desktop player bar with the current song, artwork, and anchored playback progress.
-  - Real-time remote device indicator badge on the player bar.
-- **☁️ Cloud Listening History**:
-  - Automatically synchronizes recent listening history to the cloud for cross-device access.
-  - Seamless track preservation and state restoration.
-- **⚡ Streamlined YouTube Music Sign-In**:
-  - Direct, one-click YouTube Music authentication without intermediary dialogs.
-  - Automatic session derivation and cross-device account persistence.
-- **✨ Playback & Interface Polish**:
-  - Enhanced desktop audio stream initialization and seek stability.
-  - Smoother player bar transitions and background connection handling.
+- **📱 Clean Cross-Device Remote Handover & UI**:
+  - Streamlined player bar remote indicator: compact phone icon with tooltip and instant "Play on this PC" transfer.
+  - Redesigned Now Playing device banner with subtle frosted glass styling and native controls.
+  - Eliminated UI clutter on the player bar center controls during remote sessions.
+- **✨ Playback Synchronization Polish**:
+  - Anchored playback progress calculation with smooth handover between mobile and PC.
+  - Updated YouTube stream client resolvers and playback error resiliency.
+- **📱 Ragam Mobile Enhancements**:
+  - Streamlined mobile player pill to show a clean Desktop icon when streaming on PC without crowding action buttons.
+

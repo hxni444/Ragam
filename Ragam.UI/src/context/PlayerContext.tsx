@@ -2,15 +2,12 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import type { Track, Lyrics, RepeatMode } from '../types';
 import { bridge } from '../services/bridge';
 import { 
-  auth, 
   syncNowPlayingToCloud, 
   clearNowPlayingInCloud, 
   syncTrackHistoryToCloud,
   listenToCloudNowPlaying,
-  getSyncUserId,
-  ensureFirebaseAuthSession
+  getSyncUserId
 } from '../services/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 
 const STORAGE_KEY_PLAYER_STATE = 'ragam_saved_player_state_v1';
 
@@ -104,6 +101,7 @@ interface PlayerContextType {
   toggleExpanded: () => void;
   addToQueue: (track: Track) => void;
   closePlayer: () => void;
+  takeControlHere: () => Promise<void>;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -155,6 +153,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const currentTrackRef = useRef<Track | null>(initial.currentTrack);
   const currentTimeRef = useRef<number>(initial.currentTime);
   const syncUserIdRef = useRef<string | null>(null);
+  const nextTrackRef = useRef<() => void>(() => {});
+  const prevTrackRef = useRef<() => void>(() => {});
 
   // Keep refs in sync
   useEffect(() => { queueRef.current = queue; }, [queue]);
@@ -164,33 +164,33 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
 
-  // Resolve sync ID from Firebase Auth OR YouTube Music session
+  // Resolve sync ID from YouTube Music session via Bridge
   const resolveSyncUserId = async (): Promise<string | null> => {
-    if (auth?.currentUser?.uid) {
-      syncUserIdRef.current = auth.currentUser.uid;
-      localStorage.setItem('ragam_user_id', auth.currentUser.uid);
-      return auth.currentUser.uid;
-    }
-    const cachedId = localStorage.getItem('ragam_user_id');
-    if (cachedId) {
-      syncUserIdRef.current = cachedId;
-      ensureFirebaseAuthSession().catch(() => {});
-      return cachedId;
-    }
+    // 1. Check desktop YouTube Music session via Bridge
     try {
       const bAuth = await bridge.getAuthState();
-      if (bAuth?.isLoggedIn && bAuth.userEmail) {
-        const id = getSyncUserId(bAuth.userId, bAuth.userEmail);
+      if (bAuth?.isLoggedIn) {
+        const id = getSyncUserId(bAuth.userId, bAuth.userEmail) || bAuth.userId;
         if (id) {
           syncUserIdRef.current = id;
           localStorage.setItem('ragam_user_id', id);
+          if (bAuth.userEmail) {
+            localStorage.setItem('ragam_user_email', bAuth.userEmail);
+          }
+          localStorage.removeItem('ragam_device_sync_id');
+          return id;
         }
-        ensureFirebaseAuthSession().catch(() => {});
-        return id;
       }
     } catch {}
 
-    // Fallback: persistent guest device ID so playback is always written to Firestore immediately
+    // 2. Cached real user ID in localStorage (ignore old guest fallback)
+    const cachedId = localStorage.getItem('ragam_user_id');
+    if (cachedId && !cachedId.startsWith('guest_')) {
+      syncUserIdRef.current = cachedId;
+      return cachedId;
+    }
+
+    // 3. Fallback only if genuinely unauthenticated: guest device ID
     let guestId = localStorage.getItem('ragam_device_sync_id');
     if (!guestId) {
       guestId = 'guest_' + Math.random().toString(36).substring(2, 10);
@@ -202,24 +202,132 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [remoteDeviceName, setRemoteDeviceName] = useState<string | null>(null);
 
+  // Live remote playhead state for real-time progress interpolation (Issue 2)
+  interface RemotePlayhead {
+    trackId: string;
+    positionSec: number;
+    timestampMs: number;
+    duration: number;
+    isPlaying: boolean;
+  }
+  const remotePlayheadRef = useRef<RemotePlayhead | null>(null);
+  const lastRemoteCommandTimeRef = useRef<number>(0);
+  const yieldingToRemoteRef = useRef<boolean>(false);
+
+  // Track dismissed remote sessions so closing the player is respected until mobile resumes/changes (Issue 3)
+  interface DismissedRemoteState {
+    trackId: string;
+    isPlaying: boolean;
+    timestampMs: number;
+  }
+  const dismissedRemoteRef = useRef<DismissedRemoteState | null>(null);
+
   // Subscribe to real-time cloud playback to hydrate PlayerBar from Mobile or other devices
   useEffect(() => {
     let unsubSnapshot: (() => void) | undefined;
 
     const setupCloudListener = (syncId: string) => {
       if (unsubSnapshot) unsubSnapshot();
-      unsubSnapshot = listenToCloudNowPlaying(syncId, (cloudState) => {
+      unsubSnapshot = listenToCloudNowPlaying(syncId, (cloudState: any) => {
         if (!cloudState || !cloudState.track) return;
 
-        // If desktop is currently playing audio locally, desktop is master
-        const isLocallyPlaying = audioRef.current && !audioRef.current.paused && audioRef.current.currentTime > 0;
-        if (isLocallyPlaying) return;
-
         const isFromRemote = !!(cloudState.deviceName && !cloudState.deviceName.toLowerCase().includes('desktop'));
-        const isDifferentTrack = !currentTrackRef.current || currentTrackRef.current.id !== cloudState.track.id;
+        const isLocallyPlaying = audioRef.current && !audioRef.current.paused && audioRef.current.currentTime > 0;
 
-        // Hydrate player bar if desktop is idle or update came from mobile
-        if (isDifferentTrack || isFromRemote || !currentTrackRef.current) {
+        // Check if remote device sent a remote control command to Desktop (Play, Pause, Seek)
+        const hasRemoteCommand = cloudState.remoteCommandFrom &&
+          (!cloudState.deviceName || cloudState.deviceName.toLowerCase().includes('desktop'));
+
+        if (hasRemoteCommand) {
+          const cmdTime = cloudState.commandTimestampMs || cloudState.timestampMs || 0;
+          if (cmdTime > lastRemoteCommandTimeRef.current) {
+            lastRemoteCommandTimeRef.current = cmdTime;
+            const cmd = cloudState.remoteCommand;
+
+            // Clear remoteCommand in Firestore immediately so subsequent pauses/seeks never re-trigger it
+            if (cmd && syncUserIdRef.current) {
+              syncNowPlayingToCloud(syncUserIdRef.current, {
+                remoteCommand: null,
+                remoteCommandFrom: null
+              } as any).catch(() => {});
+            }
+
+            if (cmd === 'next') {
+              console.log('[Remote Control] Skipping to next track on command from', cloudState.remoteCommandFrom);
+              nextTrackRef.current();
+              return;
+            }
+            if (cmd === 'previous') {
+              console.log('[Remote Control] Skipping to previous track on command from', cloudState.remoteCommandFrom);
+              prevTrackRef.current();
+              return;
+            }
+            if (cloudState.isPlaying === true) {
+              if (audioRef.current && audioRef.current.paused) {
+                console.log('[Remote Control] Resuming desktop playback on command from', cloudState.remoteCommandFrom);
+                audioRef.current.play().catch(console.error);
+              }
+            } else if (cloudState.isPlaying === false) {
+              if (audioRef.current && !audioRef.current.paused) {
+                console.log('[Remote Control] Pausing desktop playback on command from', cloudState.remoteCommandFrom);
+                audioRef.current.pause();
+              }
+            }
+            if (typeof cloudState.positionSec === 'number' && audioRef.current) {
+              if (Math.abs(audioRef.current.currentTime - cloudState.positionSec) > 2) {
+                audioRef.current.currentTime = cloudState.positionSec;
+              }
+            }
+          }
+          return;
+        }
+
+        // If another device (Mobile) is actively playing audio, yield local playback to Mobile
+        if (isFromRemote && cloudState.isPlaying && isLocallyPlaying) {
+          console.log('[Remote Playback] Mobile started playing; pausing desktop audio');
+          yieldingToRemoteRef.current = true;
+          audioRef.current?.pause();
+        } else if (isLocallyPlaying) {
+          // If desktop is currently playing audio locally and remote is not claiming active playback, desktop stays master
+          return;
+        }
+
+        if (!isFromRemote) return;
+
+        const trackId = cloudState.track.id;
+        const incomingIsPlaying = !!cloudState.isPlaying;
+        const incomingTimestampMs = cloudState.timestampMs || Date.now();
+
+        // Issue 3: Check if this remote playback was dismissed by the desktop user
+        if (dismissedRemoteRef.current) {
+          const dismissed = dismissedRemoteRef.current;
+          const isSameTrack = dismissed.trackId === trackId;
+
+          if (isSameTrack) {
+            // Check if user on mobile resumed playback (from paused -> playing) or restarted/replayed
+            const resumedOnMobile = (!dismissed.isPlaying && incomingIsPlaying) ||
+                                    (incomingIsPlaying && incomingTimestampMs > dismissed.timestampMs + 1500);
+
+            if (!resumedOnMobile) {
+              // Still dismissed. Update state if mobile paused while dismissed so we detect future resume
+              if (!incomingIsPlaying && dismissed.isPlaying) {
+                dismissed.isPlaying = false;
+                dismissed.timestampMs = incomingTimestampMs;
+              }
+              return; // Respect user closing the player; do not reopen!
+            } else {
+              // Mobile explicitly resumed/re-played! Un-dismiss and allow player to pop up
+              dismissedRemoteRef.current = null;
+            }
+          } else {
+            // Different song started playing on mobile! Un-dismiss and show new song
+            dismissedRemoteRef.current = null;
+          }
+        }
+
+        // Hydrate player bar
+        const isDifferentTrack = !currentTrackRef.current || currentTrackRef.current.id !== trackId;
+        if (isDifferentTrack || !currentTrackRef.current) {
           console.log('[Cloud Hydration] Hydrating PlayerBar from remote playback:', cloudState.track.title, `(${cloudState.deviceName})`);
           setCurrentTrack(cloudState.track);
           currentTrackRef.current = cloudState.track;
@@ -228,26 +336,37 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             setDuration(cloudState.track.duration);
           }
 
-          const elapsed = cloudState.isPlaying && cloudState.timestampMs
-            ? (Date.now() - cloudState.timestampMs) / 1000
-            : 0;
-          const pos = Math.min(
-            Math.max(0, (cloudState.positionSec || 0) + elapsed),
-            cloudState.track.duration || 99999
-          );
-
-          setCurrentTime(pos);
-          currentTimeRef.current = pos;
-          setRemoteDeviceName(cloudState.deviceName || null);
-
           // Update queue if empty
-          if (queueRef.current.length === 0 || queueRef.current.every(t => t.id !== cloudState.track?.id)) {
+          if (queueRef.current.length === 0 || queueRef.current.every(t => t.id !== trackId)) {
             setQueue([cloudState.track]);
             queueRef.current = [cloudState.track];
             setQueueIndex(0);
             queueIndexRef.current = 0;
           }
         }
+
+        // Calculate anchored current position
+        const elapsed = incomingIsPlaying && incomingTimestampMs
+          ? (Date.now() - incomingTimestampMs) / 1000
+          : 0;
+        const pos = Math.min(
+          Math.max(0, (cloudState.positionSec || 0) + elapsed),
+          cloudState.track.duration || 99999
+        );
+
+        setCurrentTime(pos);
+        currentTimeRef.current = pos;
+        setIsPlaying(incomingIsPlaying);
+        setRemoteDeviceName(cloudState.deviceName || 'Mobile');
+
+        // Store live playhead for our real-time ticker
+        remotePlayheadRef.current = {
+          trackId: trackId,
+          positionSec: cloudState.positionSec || 0,
+          timestampMs: incomingTimestampMs,
+          duration: cloudState.track.duration || 0,
+          isPlaying: incomingIsPlaying
+        };
       });
     };
 
@@ -260,13 +379,40 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  // Track Auth user state (both Firebase & YouTube Music) for cloud sync
+  // Issue 2: Real-time playhead ticker for remote device playback
   useEffect(() => {
+    if (!remoteDeviceName) return;
+
+    const interval = setInterval(() => {
+      // If desktop local audio is playing, local timeupdate event handles it
+      const isLocallyPlaying = audioRef.current && !audioRef.current.paused && audioRef.current.currentTime > 0;
+      if (isLocallyPlaying) return;
+
+      const remote = remotePlayheadRef.current;
+      if (remote && remote.isPlaying) {
+        const elapsed = (Date.now() - remote.timestampMs) / 1000;
+        const currentPos = Math.min(
+          Math.max(0, remote.positionSec + elapsed),
+          remote.duration || 99999
+        );
+        setCurrentTime(currentPos);
+        currentTimeRef.current = currentPos;
+      }
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [remoteDeviceName]);
+
+  // Sync playback state to Firestore cloud (ONLY when Desktop is actively playing audio locally)
+  useEffect(() => {
+    const isLocallyPlaying = audioRef.current && !audioRef.current.paused && audioRef.current.currentTime > 0;
+    if (!isLocallyPlaying || remoteDeviceName) return;
+
     resolveSyncUserId().then((id) => {
       if (id && currentTrackRef.current) {
         syncNowPlayingToCloud(id, {
           track: currentTrackRef.current,
-          isPlaying: isPlaying,
+          isPlaying: true,
           positionSec: audioRef.current?.currentTime || currentTimeRef.current || 0,
           timestampMs: Date.now(),
           deviceName: 'Ragam Desktop',
@@ -276,19 +422,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }).catch(() => {});
       }
     });
-
-    let unsub: (() => void) | undefined;
-    if (auth) {
-      unsub = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          syncUserIdRef.current = user.uid;
-        } else {
-          await resolveSyncUserId();
-        }
-      });
-    }
-    return () => { if (unsub) unsub(); };
-  }, [isPlaying, volume]);
+  }, [volume, remoteDeviceName]);
 
   // Save player state to localStorage whenever it changes
   const savePlayerState = () => {
@@ -330,6 +464,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const handleUnload = () => {
       savePlayerState();
+      // If remote mobile was playing, or desktop was not actively playing audio, do not touch cloud state!
+      if (remoteDeviceName) return;
+      const isLocallyPlaying = audioRef.current && !audioRef.current.paused && audioRef.current.currentTime > 0;
+      if (!isLocallyPlaying) return;
       const syncId = syncUserIdRef.current;
       if (syncId && currentTrackRef.current) {
         syncNowPlayingToCloud(syncId, {
@@ -391,6 +529,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const playTrackInternal = async (track: Track, newQueue?: Track[], targetIndex?: number, startFromSeconds = 0) => {
     try {
+      setRemoteDeviceName(null);
+      remotePlayheadRef.current = null;
+      dismissedRemoteRef.current = null;
       setCurrentTrack(track);
       currentTrackRef.current = track;
       setCurrentTime(startFromSeconds);
@@ -580,6 +721,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const nextTrackInternal = () => {
+    if (remoteDeviceName && syncUserIdRef.current) {
+      console.log('[Remote Control] Sending next command to remote device:', remoteDeviceName);
+      syncNowPlayingToCloud(syncUserIdRef.current, {
+        remoteCommand: 'next',
+        remoteCommandFrom: 'Ragam Desktop',
+        commandTimestampMs: Date.now()
+      } as any).catch(console.error);
+      return;
+    }
+
     const q = queueRef.current;
     if (q.length === 0) return;
 
@@ -600,6 +751,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const prevTrackInternal = () => {
+    if (remoteDeviceName && syncUserIdRef.current) {
+      console.log('[Remote Control] Sending previous command to remote device:', remoteDeviceName);
+      syncNowPlayingToCloud(syncUserIdRef.current, {
+        remoteCommand: 'previous',
+        remoteCommandFrom: 'Ragam Desktop',
+        commandTimestampMs: Date.now()
+      } as any).catch(console.error);
+      return;
+    }
+
     const q = queueRef.current;
     if (q.length === 0) return;
 
@@ -619,6 +780,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setCurrentTime(0);
     }
   };
+
+  nextTrackRef.current = nextTrackInternal;
+  prevTrackRef.current = prevTrackInternal;
 
   // Setup Audio Elements
   useEffect(() => {
@@ -667,6 +831,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
     const handlePause = () => {
       setIsPlaying(false);
+      if (yieldingToRemoteRef.current) {
+        console.log('[Playback Handover] Suppressing desktop cloud pause sync because audio yielded to Mobile');
+        yieldingToRemoteRef.current = false;
+        return;
+      }
       const syncId = syncUserIdRef.current;
       if (syncId && currentTrackRef.current) {
         syncNowPlayingToCloud(syncId, {
@@ -708,6 +877,22 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const togglePlay = () => {
     if (!currentTrack) return;
 
+    if (remoteDeviceName && syncUserIdRef.current) {
+      const nextPlay = !isPlaying;
+      setIsPlaying(nextPlay);
+      if (remotePlayheadRef.current) {
+        remotePlayheadRef.current.isPlaying = nextPlay;
+        remotePlayheadRef.current.timestampMs = Date.now();
+      }
+      syncNowPlayingToCloud(syncUserIdRef.current, {
+        isPlaying: nextPlay,
+        remoteCommand: nextPlay ? 'play' : 'pause',
+        remoteCommandFrom: 'Ragam Desktop',
+        commandTimestampMs: Date.now()
+      } as any).catch(console.error);
+      return;
+    }
+
     if (!audioRef.current || !audioRef.current.src || audioRef.current.src === '' || audioRef.current.src === window.location.href) {
       // Resume restored song from saved timestamp
       playTrackInternal(currentTrack, queueRef.current, queueIndexRef.current, currentTime);
@@ -723,6 +908,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const seek = (seconds: number) => {
     if (!currentTrack) return;
+
+    if (remoteDeviceName && syncUserIdRef.current) {
+      setCurrentTime(seconds);
+      if (remotePlayheadRef.current) {
+        remotePlayheadRef.current.positionSec = seconds;
+        remotePlayheadRef.current.timestampMs = Date.now();
+      }
+      syncNowPlayingToCloud(syncUserIdRef.current, {
+        positionSec: seconds,
+        remoteCommandFrom: 'Ragam Desktop',
+        commandTimestampMs: Date.now()
+      } as any).catch(console.error);
+      return;
+    }
+
     if (audioRef.current && audioRef.current.src && audioRef.current.src !== '' && audioRef.current.src !== window.location.href) {
       audioRef.current.currentTime = seconds;
       setCurrentTime(seconds);
@@ -793,6 +993,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRef.current.load();
       audioRef.current.currentTime = 0;
     }
+
+    // Issue 3: If closing while remote mobile device is playing, record dismissal so listener doesn't reopen it
+    if (remoteDeviceName && currentTrackRef.current) {
+      dismissedRemoteRef.current = {
+        trackId: currentTrackRef.current.id,
+        isPlaying: remotePlayheadRef.current?.isPlaying ?? isPlaying,
+        timestampMs: remotePlayheadRef.current?.timestampMs ?? Date.now()
+      };
+    } else {
+      dismissedRemoteRef.current = null;
+      const syncId = syncUserIdRef.current;
+      if (syncId) {
+        clearNowPlayingInCloud(syncId).catch(() => {});
+      }
+    }
+
+    remotePlayheadRef.current = null;
+    setRemoteDeviceName(null);
     setCurrentTrack(null);
     currentTrackRef.current = null;
     setIsPlaying(false);
@@ -807,14 +1025,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       navigator.mediaSession.playbackState = 'none';
       navigator.mediaSession.metadata = null;
     }
-    const syncId = syncUserIdRef.current;
-    if (syncId) {
-      clearNowPlayingInCloud(syncId).catch(() => {});
-    }
   };
 
   const addToQueue = (track: Track) => {
     setQueue((prev) => [...prev, track]);
+  };
+
+  const takeControlHere = async () => {
+    const track = currentTrackRef.current;
+    if (!track) return;
+    const pos = currentTimeRef.current || 0;
+    console.log('[Take Control] Transferring playback to PC from', remoteDeviceName, 'at', pos, 'seconds');
+
+    // 1. Tell remote mobile device to pause
+    const syncId = syncUserIdRef.current;
+    if (syncId) {
+      syncNowPlayingToCloud(syncId, {
+        isPlaying: false,
+        remoteCommand: 'pause',
+        remoteCommandFrom: 'Ragam Desktop',
+        commandTimestampMs: Date.now()
+      } as any).catch(console.error);
+    }
+
+    // 2. Clear remote state and start playing locally on Desktop from current position
+    setRemoteDeviceName(null);
+    remotePlayheadRef.current = null;
+    dismissedRemoteRef.current = null;
+    await playTrackInternal(track, queueRef.current, queueIndexRef.current, pos);
   };
 
   // MediaSession integration
@@ -994,6 +1232,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsQueueOpen,
         addToQueue,
         closePlayer,
+        takeControlHere,
         isExpanded,
         setIsExpanded,
         toggleExpanded

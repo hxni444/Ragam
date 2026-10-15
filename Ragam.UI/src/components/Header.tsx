@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Search, Home as HomeIcon, LogOut, User, Loader2 } from 'lucide-react';
 import type { NavigationTarget, AuthState } from '../types';
 import { bridge } from '../services/bridge';
-import { auth, mapFirebaseUserToAuthState, logoutFromFirebase, getSyncUserId, ensureFirebaseAuthSession } from '../services/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { getSyncUserId } from '../services/firebase';
 
 interface HeaderProps {
   onNavigate: (target: NavigationTarget) => void;
@@ -29,12 +28,13 @@ export const Header: React.FC<HeaderProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
-    // 1. Initial bridge check
+    // Check YouTube Music auth state via desktop bridge
     bridge.getAuthState().then((state) => {
       if (state && state.isLoggedIn) {
-        const userId = getSyncUserId(state.userId, state.userEmail);
+        const userId = getSyncUserId(state.userId, state.userEmail) || state.userId;
         if (userId) {
           localStorage.setItem('ragam_user_id', userId);
+          localStorage.removeItem('ragam_device_sync_id');
         }
         if (state.userEmail) {
           localStorage.setItem('ragam_user_email', state.userEmail);
@@ -43,26 +43,10 @@ export const Header: React.FC<HeaderProps> = ({
           ...state,
           userId: userId || undefined
         });
-        ensureFirebaseAuthSession().catch(() => {});
       } else {
         setAuthState(state);
       }
     }).catch(console.error);
-
-    // 2. Firebase persistence listener across app launches / restarts
-    let unsubscribe: (() => void) | undefined;
-    if (auth) {
-      unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) {
-          const mapped = mapFirebaseUserToAuthState(user);
-          if (mapped.userId) {
-            localStorage.setItem('ragam_user_id', mapped.userId);
-          }
-          setAuthState(mapped);
-        }
-      });
-    }
-    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
   const handleLogin = async () => {
@@ -71,9 +55,10 @@ export const Header: React.FC<HeaderProps> = ({
     try {
       const state = await bridge.loginYouTube();
       if (state && state.isLoggedIn) {
-        const userId = getSyncUserId(state.userId, state.userEmail);
+        const userId = getSyncUserId(state.userId, state.userEmail) || state.userId;
         if (userId) {
           localStorage.setItem('ragam_user_id', userId);
+          localStorage.removeItem('ragam_device_sync_id');
         }
         if (state.userEmail) {
           localStorage.setItem('ragam_user_email', state.userEmail);
@@ -82,7 +67,6 @@ export const Header: React.FC<HeaderProps> = ({
           ...state,
           userId: userId || undefined
         });
-        await ensureFirebaseAuthSession().catch(() => {});
         window.location.reload();
       }
     } catch (err) {
@@ -93,14 +77,10 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleLogout = async () => {
-    try {
-      await logoutFromFirebase();
-    } catch (e) {
-      console.warn('Firebase logout warning:', e);
-    }
     await bridge.logout();
     localStorage.removeItem('ragam_user_id');
     localStorage.removeItem('ragam_user_email');
+    localStorage.removeItem('ragam_device_sync_id');
     setAuthState({ isLoggedIn: false });
     setShowUserMenu(false);
     window.location.reload();

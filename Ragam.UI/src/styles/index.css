@@ -665,7 +665,9 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  width: 280px;
+  min-width: 260px;
+  max-width: 380px;
+  width: auto;
 }
 
 .player-thumb {
@@ -1398,3 +1400,151 @@ body {
   min-width: 44px;
   text-align: center;
 }
+
+/* ==========================================================================
+   Remote Playback & Handover Styles (Spotify Connect / Apple AirPlay style)
+   ========================================================================== */
+
+.remote-session-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 6px 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 1px;
+  max-width: 100%;
+}
+
+.remote-badge-icon {
+  color: var(--text-subdued);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.take-control-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+  margin-left: 2px;
+  white-space: nowrap;
+}
+
+.take-control-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.take-control-btn:active {
+  transform: scale(0.97);
+}
+
+/* NowPlayingView Expanded Remote Banner */
+.nowplaying-remote-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  margin-bottom: 14px;
+  width: fit-content;
+  min-width: 290px;
+  max-width: 100%;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.nowplaying-remote-badge:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.nowplaying-remote-info {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.nowplaying-remote-icon-frame {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  flex-shrink: 0;
+}
+
+.nowplaying-remote-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.nowplaying-remote-kicker {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-subdued);
+  line-height: 1.1;
+}
+
+.nowplaying-remote-device-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
+}
+
+.nowplaying-take-control-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease-out;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nowplaying-take-control-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-0.5px);
+}
+
+.nowplaying-take-control-btn:active {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.1);
+}
+

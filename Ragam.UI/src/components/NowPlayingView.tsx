@@ -14,7 +14,9 @@ import {
   Mic2,
   Loader2,
   Music2,
-  Radio
+  Radio,
+  Smartphone,
+  Laptop
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { AddToLibraryMenu } from './AddToLibraryMenu';
@@ -22,6 +24,8 @@ import { AddToLibraryMenu } from './AddToLibraryMenu';
 export const NowPlayingView: React.FC = () => {
   const {
     currentTrack,
+    remoteDeviceName,
+    takeControlHere,
     isPlaying,
     isLoading,
     currentTime,
@@ -149,6 +153,28 @@ export const NowPlayingView: React.FC = () => {
 
         {/* Right / Bottom: Details & Controls */}
         <div className="nowplaying-info-controls">
+          {remoteDeviceName && !remoteDeviceName.toLowerCase().includes('desktop') && (
+            <div className="nowplaying-remote-badge">
+              <div className="nowplaying-remote-info">
+                <div className="nowplaying-remote-icon-frame">
+                  <Smartphone size={14} />
+                </div>
+                <div className="nowplaying-remote-meta">
+                  <span className="nowplaying-remote-kicker">Playing on</span>
+                  <span className="nowplaying-remote-device-name" title={remoteDeviceName}>{remoteDeviceName}</span>
+                </div>
+              </div>
+              <button 
+                className="nowplaying-take-control-btn"
+                onClick={() => takeControlHere()}
+                title="Transfer playback from phone to this PC"
+              >
+                <Laptop size={13} />
+                <span>Switch to this PC</span>
+              </button>
+            </div>
+          )}
+
           {/* Title & Artist Row */}
           <div className="nowplaying-title-row">
             <div style={{ overflow: 'hidden' }}>

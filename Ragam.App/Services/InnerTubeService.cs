@@ -15,6 +15,7 @@ public class InnerTubeSession
     public string? AccountName { get; set; }
     public string? AccountEmail { get; set; }
     public string? AvatarUrl { get; set; }
+    public string? ChannelHandle { get; set; }
     public bool IsLoggedIn => !string.IsNullOrEmpty(Cookie) && (Cookie.Contains("SAPISID") || Cookie.Contains("SSID") || Cookie.Contains("__Secure-3PAPISID"));
 }
 
@@ -36,6 +37,13 @@ public class InnerTubeService
     {
         _httpClient = new HttpClient();
         _session = LoadSession();
+        if (_session.IsLoggedIn && string.IsNullOrEmpty(_session.AccountEmail))
+        {
+            _ = Task.Run(async () =>
+            {
+                await RefreshAccountInfoAsync();
+            });
+        }
     }
 
     private InnerTubeSession LoadSession()
@@ -134,42 +142,62 @@ public class InnerTubeService
             req.Content = new StringContent(JsonSerializer.Serialize(contextBody), Encoding.UTF8, "application/json");
 
             var res = await _httpClient.SendAsync(req);
-            if (!res.IsSuccessStatusCode) return false;
-
-            var json = await res.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            // Extract account name, email, avatar from account_menu
-            if (root.TryGetProperty("actions", out var actions) && actions.GetArrayLength() > 0)
+            if (res.IsSuccessStatusCode)
             {
-                var action = actions[0];
-                if (action.TryGetProperty("openPopupAction", out var popupAction) &&
-                    popupAction.TryGetProperty("popup", out var popup) &&
-                    popup.TryGetProperty("multiPageMenuRenderer", out var menu))
+                var json = await res.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                // Extract account name, email, avatar, channelHandle from account_menu
+                if (root.TryGetProperty("actions", out var actions) && actions.GetArrayLength() > 0)
                 {
-                    if (menu.TryGetProperty("header", out var header) &&
-                        header.TryGetProperty("activeAccountHeaderRenderer", out var accountHeader))
+                    var action = actions[0];
+                    if (action.TryGetProperty("openPopupAction", out var popupAction) &&
+                        popupAction.TryGetProperty("popup", out var popup) &&
+                        popup.TryGetProperty("multiPageMenuRenderer", out var menu))
                     {
-                        if (accountHeader.TryGetProperty("accountName", out var accName) &&
-                            accName.TryGetProperty("runs", out var runs) && runs.GetArrayLength() > 0)
+                        if (menu.TryGetProperty("header", out var header) &&
+                            header.TryGetProperty("activeAccountHeaderRenderer", out var accountHeader))
                         {
-                            _session.AccountName = runs[0].GetProperty("text").GetString();
-                        }
+                            if (accountHeader.TryGetProperty("accountName", out var accName) &&
+                                accName.TryGetProperty("runs", out var runs) && runs.GetArrayLength() > 0)
+                            {
+                                _session.AccountName = runs[0].GetProperty("text").GetString();
+                            }
 
-                        if (accountHeader.TryGetProperty("email", out var emailProp) &&
-                            emailProp.TryGetProperty("runs", out var eRuns) && eRuns.GetArrayLength() > 0)
-                        {
-                            _session.AccountEmail = eRuns[0].GetProperty("text").GetString();
-                        }
+                            if (accountHeader.TryGetProperty("email", out var emailProp) &&
+                                emailProp.TryGetProperty("runs", out var eRuns) && eRuns.GetArrayLength() > 0)
+                            {
+                                _session.AccountEmail = eRuns[0].GetProperty("text").GetString();
+                            }
 
-                        if (accountHeader.TryGetProperty("accountPhoto", out var photo) &&
-                            photo.TryGetProperty("thumbnails", out var thumbs) && thumbs.GetArrayLength() > 0)
-                        {
-                            _session.AvatarUrl = thumbs[thumbs.GetArrayLength() - 1].GetProperty("url").GetString();
+                            if (accountHeader.TryGetProperty("channelHandle", out var handleProp) &&
+                                handleProp.TryGetProperty("runs", out var hRuns) && hRuns.GetArrayLength() > 0)
+                            {
+                                _session.ChannelHandle = hRuns[0].GetProperty("text").GetString();
+                            }
+
+                            if (accountHeader.TryGetProperty("accountPhoto", out var photo) &&
+                                photo.TryGetProperty("thumbnails", out var thumbs) && thumbs.GetArrayLength() > 0)
+                            {
+                                _session.AvatarUrl = thumbs[thumbs.GetArrayLength() - 1].GetProperty("url").GetString();
+                            }
                         }
                     }
                 }
+
+                if (string.IsNullOrEmpty(_session.DataSyncId) &&
+                    root.TryGetProperty("mainAppWebResponseContext", out var mainCtx) &&
+                    mainCtx.TryGetProperty("datasyncId", out var dsProp))
+                {
+                    _session.DataSyncId = dsProp.GetString()?.TrimEnd('|');
+                }
+            }
+
+            // If account email was not returned in account_menu, query YouTube account page
+            if (string.IsNullOrEmpty(_session.AccountEmail))
+            {
+                await FetchEmailFromYouTubeAsync();
             }
 
             SaveSessionToFile();
@@ -179,6 +207,65 @@ public class InnerTubeService
         {
             System.Diagnostics.Debug.WriteLine($"Error in RefreshAccountInfoAsync: {ex.Message}");
             return false;
+        }
+    }
+
+    private async Task FetchEmailFromYouTubeAsync()
+    {
+        if (!_session.IsLoggedIn || string.IsNullOrEmpty(_session.Cookie)) return;
+
+        try
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, "https://www.youtube.com/account");
+            req.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36");
+            req.Headers.Add("Cookie", _session.Cookie);
+
+            var sapisid = ExtractCookieValue(_session.Cookie, "SAPISID") ??
+                          ExtractCookieValue(_session.Cookie, "__Secure-3PAPISID") ??
+                          ExtractCookieValue(_session.Cookie, "SSID");
+            if (!string.IsNullOrEmpty(sapisid))
+            {
+                var currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var sapisidHash = Sha1($"{currentTime} {sapisid} https://www.youtube.com");
+                req.Headers.Add("Authorization", $"SAPISIDHASH {currentTime}_{sapisidHash}");
+            }
+
+            var res = await _httpClient.SendAsync(req);
+            if (res.IsSuccessStatusCode)
+            {
+                var html = await res.Content.ReadAsStringAsync();
+
+                // 1. Primary: Match "Signed in as ... email"
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    html,
+                    @"Signed in as\s*.*?""text"":\s*""([^""]+@[^""]+\.[a-zA-Z]{2,})""",
+                    System.Text.RegularExpressions.RegexOptions.Singleline
+                );
+                if (match.Success)
+                {
+                    _session.AccountEmail = match.Groups[1].Value.Trim();
+                    System.Diagnostics.Debug.WriteLine($"[InnerTubeService] Extracted user email: {_session.AccountEmail}");
+                    return;
+                }
+
+                // 2. Secondary: Look for any user email (excluding google domains)
+                var emailMatches = System.Text.RegularExpressions.Regex.Matches(html, @"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}");
+                foreach (System.Text.RegularExpressions.Match em in emailMatches)
+                {
+                    var val = em.Value.Trim();
+                    if (!val.EndsWith("google.com", StringComparison.OrdinalIgnoreCase) &&
+                        !val.EndsWith("gstatic.com", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _session.AccountEmail = val;
+                        System.Diagnostics.Debug.WriteLine($"[InnerTubeService] Extracted user email (secondary): {_session.AccountEmail}");
+                        return;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[InnerTubeService] Error in FetchEmailFromYouTubeAsync: {ex.Message}");
         }
     }
 
@@ -206,11 +293,7 @@ public class InnerTubeService
             {
                 ["context"] = new Dictionary<string, object?>
                 {
-                    ["client"] = clientDict,
-                    ["user"] = new Dictionary<string, object?>
-                    {
-                        ["onBehalfOfUser"] = _session.DataSyncId
-                    }
+                    ["client"] = clientDict
                 }
             };
 
@@ -1721,11 +1804,7 @@ public class InnerTubeService
             {
                 ["context"] = new Dictionary<string, object?>
                 {
-                    ["client"] = clientDict,
-                    ["user"] = new Dictionary<string, object?>
-                    {
-                        ["onBehalfOfUser"] = _session.DataSyncId
-                    }
+                    ["client"] = clientDict
                 },
                 ["videoId"] = videoId,
                 ["cpn"] = cpn,
@@ -1924,11 +2003,7 @@ public class InnerTubeService
             {
                 ["context"] = new Dictionary<string, object?>
                 {
-                    ["client"] = clientDict,
-                    ["user"] = new Dictionary<string, object?>
-                    {
-                        ["onBehalfOfUser"] = _session.DataSyncId
-                    }
+                    ["client"] = clientDict
                 },
                 ["videoId"] = videoId,
                 ["playlistId"] = targetPlaylistId,
@@ -2118,11 +2193,6 @@ public class InnerTubeService
         if (!string.IsNullOrEmpty(_session.VisitorData))
         {
             req.Headers.Add("X-Goog-Visitor-Id", _session.VisitorData);
-        }
-
-        if (!string.IsNullOrEmpty(_session.DataSyncId))
-        {
-            req.Headers.Add("X-Goog-PageId", _session.DataSyncId);
         }
 
         if (_session.IsLoggedIn && !string.IsNullOrEmpty(_session.Cookie))
